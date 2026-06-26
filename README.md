@@ -20,6 +20,11 @@ time.
 **M5: Compliance rails (opt-out, suppression, CAN-SPAM, caps, warmup) + Deliverability.**
 **M6: Self-improvement — nightly reflection, "what it taught itself" log, A/B holdout.**
 **M7: Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.**
+**M8: Reseller / white-label — agency roll-up, per-client branding, org switcher.**
+
+> **All 8 milestones complete.** The full spec is built: the agent loop,
+> two-layer memory, the send/reply/booking pipeline, compliance + deliverability,
+> bounded self-improvement, the integration adapters, and the reseller layer.
 
 > **v1 acceptance:** create an org → import prior leads → the agent drafts a
 > personalized re-engagement email grounded in real memory → approve/edit →
@@ -92,11 +97,12 @@ What works right now, end-to-end:
   `CalendarProvider`. Connect with a key for live data, or with none for sample
   contacts — zero code changes.
 
-### What's still to come
-
-| Area | Milestone |
-| --- | --- |
-| Reseller / white-label roll-up screens | M8 |
+- **Reseller / white-label (M8).** An **Agency** owns **Client** orgs, fully
+  isolated. A **reseller roll-up** (`/clients`) shows recovered revenue, calls,
+  and margin across clients with per-client drill-in; **white-label** branding
+  (name, color, from-domain) means a client's users see *their* brand — never
+  "The Warm Sweep" — and an **org switcher** moves between workspaces (membership
+  re-verified server-side). Roles: Agency admin / Client admin / Member.
 
 The nav shows later screens marked **SOON** so the structure is locked now.
 **Every send is still gated by approval** (v1 default). Compliance rails + the Deliverability view land in M5.

@@ -14,7 +14,7 @@ import { signInSchema } from "@/lib/zod/org";
  * without a DB round-trip on every call. A user can belong to multiple orgs;
  * for v1 we resolve the first membership as active (org switcher comes later).
  */
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update: updateSession } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/sign-in" },
   trustHost: true,
@@ -53,11 +53,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt: async ({ token, user }) => {
+    jwt: async ({ token, user, trigger, session }) => {
       if (user) {
         token.uid = (user as { id: string }).id;
         token.activeOrgId = (user as { activeOrgId: string | null }).activeOrgId;
         token.activeRole = (user as { activeRole: string | null }).activeRole;
+      }
+      // Org switch: re-issue the token's active org/role, but ONLY after
+      // re-verifying the user actually belongs to the target org (the action
+      // checks membership and passes the validated role).
+      if (trigger === "update" && session?.activeOrgId && token.uid) {
+        const membership = await prisma.membership.findUnique({
+          where: { userId_orgId: { userId: token.uid as string, orgId: session.activeOrgId } },
+        });
+        if (membership) {
+          token.activeOrgId = membership.orgId;
+          token.activeRole = membership.role;
+        }
       }
       return token;
     },

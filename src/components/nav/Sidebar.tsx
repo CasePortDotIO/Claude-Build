@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { switchOrgAction } from "@/server/actions/org";
+import type { Branding } from "@/lib/branding";
 
 /**
- * The dark left rail from the mockup. Brand block, nav, and a user footer.
- * Screens beyond Leads/Command Center are present but flagged "soon" — they
- * land in later milestones; the nav structure is locked now so it doesn't move.
+ * The dark left rail from the mockup. White-labeled brand block, an org switcher
+ * (for users in multiple workspaces / agency admins), nav, and a user footer.
+ * The Clients (reseller) item only appears for agency admins.
  */
 
 interface NavItem {
@@ -16,7 +19,13 @@ interface NavItem {
   icon: React.ReactNode;
   badgeKey?: "pendingDrafts" | "needsReview";
   reseller?: boolean;
-  soon?: boolean;
+}
+
+interface MembershipVM {
+  orgId: string;
+  name: string;
+  role: string;
+  type: string;
 }
 
 const ICON = (path: React.ReactNode) => (
@@ -33,19 +42,35 @@ const NAV: NavItem[] = [
   { href: "/agent", label: "The Agent", icon: ICON(<><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" /><circle cx="12" cy="12" r="3.2" /></>) },
   { href: "/connections", label: "Connections", icon: ICON(<path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />) },
   { href: "/deliverability", label: "Deliverability", icon: ICON(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />) },
-  { href: "/clients", label: "Clients", reseller: true, soon: true, icon: ICON(<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" />) },
+  { href: "/clients", label: "Clients", reseller: true, icon: ICON(<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" />) },
 ];
 
 export function Sidebar({
   userName,
   orgName,
   badges,
+  branding,
+  memberships = [],
+  activeOrgId,
+  isAgencyAdmin = false,
 }: {
   userName: string;
   orgName: string;
   badges?: { pendingDrafts?: number; needsReview?: number };
+  branding: Branding;
+  memberships?: MembershipVM[];
+  activeOrgId: string;
+  isAgencyAdmin?: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+
+  function switchTo(orgId: string) {
+    if (orgId === activeOrgId) return setSwitcherOpen(false);
+    switchOrgAction(orgId).then(() => { setSwitcherOpen(false); router.push("/"); router.refresh(); });
+  }
+  const nav = NAV.filter((item) => !item.reseller || isAgencyAdmin);
   const initials = userName
     .split(" ")
     .map((p) => p[0])
@@ -55,16 +80,45 @@ export function Sidebar({
 
   return (
     <aside className="ws-scroll sticky top-0 flex h-screen w-[248px] flex-none flex-col overflow-y-auto bg-charcoal">
-      <div className="border-b border-charcoal-line px-[22px] pb-[22px] pt-6">
-        <p className="m-0 mb-[3px] font-heading text-[15px] font-semibold tracking-[-0.2px] text-sweep-light">
-          Coach. Don&apos;t Chase.
+      <div className="relative border-b border-charcoal-line px-[22px] pb-[18px] pt-6">
+        <p className="m-0 mb-[3px] font-heading text-[15px] font-semibold tracking-[-0.2px]" style={{ color: branding.color }}>
+          {branding.tagline}
         </p>
-        <p className="m-0 mb-[7px] text-[12px] tracking-[0.3px] text-on-dark-mute">The Warm Sweep™</p>
-        <p className="m-0 text-[10.5px] tracking-[0.3px] text-[#5a6066]">by Delegate and Done</p>
+        <p className="m-0 mb-[7px] truncate text-[12px] tracking-[0.3px] text-on-dark-mute">{branding.name}</p>
+        {branding.poweredBy && <p className="m-0 truncate text-[10.5px] tracking-[0.3px] text-[#5a6066]">{branding.poweredBy}</p>}
+
+        {/* org switcher — only when the user belongs to more than one workspace */}
+        {memberships.length > 1 && (
+          <div className="mt-3">
+            <button
+              onClick={() => setSwitcherOpen((v) => !v)}
+              className="flex w-full items-center justify-between rounded-lg bg-charcoal-soft px-3 py-2 text-[12.5px] font-medium text-on-dark hover:bg-[#2c3137]"
+            >
+              <span className="truncate">{orgName}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4" /></svg>
+            </button>
+            {switcherOpen && (
+              <div className="absolute left-[22px] right-[22px] z-50 mt-1 overflow-hidden rounded-lg border border-charcoal-line bg-[#1d2125] shadow-xl">
+                {memberships.map((m) => (
+                  <button
+                    key={m.orgId}
+                    onClick={() => switchTo(m.orgId)}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-[12.5px] hover:bg-charcoal-soft ${m.orgId === activeOrgId ? "text-white" : "text-on-dark-soft"}`}
+                  >
+                    <span className="truncate">{m.name}</span>
+                    <span className="ml-2 flex-none rounded bg-charcoal px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-on-dark-mute">
+                      {m.type === "AGENCY" ? "agency" : m.role.replace("CLIENT_", "").replace("_", " ").toLowerCase()}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-[3px] p-3">
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           const badgeCount = item.badgeKey ? badges?.[item.badgeKey] ?? 0 : 0;
           return (
@@ -85,11 +139,6 @@ export function Sidebar({
               {item.reseller && (
                 <span className="ml-auto rounded border border-[#34393f] px-[5px] py-0.5 text-[9px] font-semibold tracking-[0.8px] text-on-dark-mute">
                   RESELLER
-                </span>
-              )}
-              {item.soon && !item.reseller && (
-                <span className="ml-auto rounded bg-charcoal-soft px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.5px] text-on-dark-mute">
-                  SOON
                 </span>
               )}
             </Link>

@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { assertRole } from "@/lib/roles";
 import type { Role } from "@prisma/client";
+
+export { assertRole };
 
 export interface ActiveContext {
   userId: string;
@@ -28,17 +31,4 @@ export async function requireOrg(): Promise<ActiveContext> {
     email: user.email ?? "",
     name: user.name ?? null,
   };
-}
-
-const ROLE_RANK: Record<Role, number> = {
-  MEMBER: 1,
-  CLIENT_ADMIN: 2,
-  AGENCY_ADMIN: 3,
-};
-
-/** Throw if the context's role is below the required role. */
-export function assertRole(ctx: ActiveContext, required: Role): void {
-  if (ROLE_RANK[ctx.role] < ROLE_RANK[required]) {
-    throw new Error(`Forbidden: requires ${required}`);
-  }
 }

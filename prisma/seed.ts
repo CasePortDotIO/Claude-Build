@@ -25,29 +25,37 @@ async function main() {
     create: { name: "Delegate and Done", slug: "delegate-and-done", type: "AGENCY", brandName: "Delegate and Done" },
   });
 
-  // --- Client org A: Monroe Coaching ---
+  // --- Client org A: Monroe Coaching (white-labeled) ---
   const monroe = await prisma.org.upsert({
     where: { slug: "monroe-coaching" },
-    update: {},
+    update: { brandName: "Monroe Coaching", brandColor: "#1B7A57", clientPriceCents: 49700, billingStatus: "active" },
     create: {
       name: "Monroe Coaching",
       slug: "monroe-coaching",
       type: "CLIENT",
       parentAgencyId: agency.id,
       mailingAddress: "1200 Lakeview Dr, Austin, TX 78701",
+      brandName: "Monroe Coaching",
+      brandColor: "#1B7A57",
+      clientPriceCents: 49700,
+      billingStatus: "active",
     },
   });
 
-  // --- Client org B: Apex Fitness (proves isolation from Monroe) ---
+  // --- Client org B: Apex Fitness (own brand; proves isolation from Monroe) ---
   const apex = await prisma.org.upsert({
     where: { slug: "apex-fitness" },
-    update: {},
+    update: { brandName: "Apex Fitness Studio", brandColor: "#E8743B", clientPriceCents: 39700, billingStatus: "active" },
     create: {
       name: "Apex Fitness Studio",
       slug: "apex-fitness",
       type: "CLIENT",
       parentAgencyId: agency.id,
       mailingAddress: "55 Market St, Denver, CO 80202",
+      brandName: "Apex Fitness Studio",
+      brandColor: "#E8743B",
+      clientPriceCents: 39700,
+      billingStatus: "active",
     },
   });
 

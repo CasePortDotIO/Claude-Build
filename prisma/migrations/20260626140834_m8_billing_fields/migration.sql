@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Org" ADD COLUMN     "billingStatus" TEXT NOT NULL DEFAULT 'active',
+ADD COLUMN     "clientPriceCents" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "seats" INTEGER NOT NULL DEFAULT 1;

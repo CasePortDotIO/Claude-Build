@@ -9,7 +9,7 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - [x] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view. **← v1 (M1–M5) acceptance complete.**
 - [x] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
 - [x] **M7 — More integrations.** Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.
-- [ ] **M8 — Reseller/white-label.** Agency roll-up + per-client branding + per-seat billing fields.
+- [x] **M8 — Reseller/white-label.** Agency roll-up + per-client branding + per-seat billing fields. **← all 8 milestones complete.**
 
 ## Confirmed stack decisions
 - Inngest for jobs/scheduling (serverless-native; matches Vercel). BullMQ+Redis only if self-host is required.
@@ -131,3 +131,20 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - **Same gate for every source.** Whether leads come from CSV, HubSpot, Sheets, Mailchimp, or Kajabi, they pass through one `ingestLeads` path — prior-contact attestation, suppression + dedupe, audit. New sources can't bypass it.
 - **Runs offline.** Connect a source with **no API key** → deterministic **sample** contacts so the import flow is demoable; add a key (+ config like list/sheet/subdomain id) to go live, zero code changes.
 - **Microsoft 365** needs `MICROSOFT_CLIENT_ID/SECRET` (OAuth, tokens encrypted) — same pattern as Gmail. **Calendly** is scheduling-link-first: the agent offers slots and the invitee self-books (captured by the Cal.com-style webhook); direct server booking is link-based.
+
+## M8 file map (built) — reseller / white-label
+
+- `prisma/schema.prisma` — Org billing fields (clientPriceCents, seats, billingStatus); white-label fields (brandName/color/logo/fromDomain) were modeled in M1.
+- `src/lib/branding.ts` — `resolveBranding`: a client's brand replaces "The Warm Sweep" for its users.
+- `src/lib/agency.ts` — `agencyForUser` (authorization gate; works from any active org), `agencyRollup` (per-client recovered revenue/calls/reply-rate/margin, isolated to the agency's own clients).
+- `src/lib/roles.ts` — pure role hierarchy + `assertRole` (extracted so it's test/Edge-safe).
+- `src/lib/auth.ts` — JWT `update` handling for org switching, **membership re-verified** in the callback.
+- `src/server/actions/org.ts` — switch org, create client, update client branding/billing, list memberships. Agency actions authorize via `agencyForUser`, not the active role.
+- `src/components/nav/Sidebar.tsx` — white-labeled brand block + **org switcher** (multi-workspace users) + Clients nav gated to agency admins.
+- `src/app/(app)/clients/**` — reseller roll-up (margin + per-client KPIs), add-client, per-client white-label/billing edit, "open workspace" drill-in. `generateMetadata` white-labels the browser tab too.
+- Tests: agency roll-up aggregation + **cross-agency isolation** (one reseller never sees another's book), brand resolution, role hierarchy, agency authorization from any active org.
+
+### M8 notes
+- **Isolation holds through the reseller layer:** the roll-up only sums the agency's own clients; per-client memory, suppression, and metrics stay scoped. Verified live — Marco (a client user) is redirected from `/clients` and sees only his own brand.
+- **White-label is real:** client users see their org's brand name + color in the shell and the browser title, "powered by [agency]" — never "The Warm Sweep". Default branding only shows for the product's own/unbranded workspaces.
+- **Org switching** re-issues the session's active org but re-verifies membership server-side first; it can't be used to jump into a workspace you don't belong to.

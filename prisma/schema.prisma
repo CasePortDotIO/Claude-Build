@@ -44,11 +44,17 @@ model Org {
   parentAgency   Org?    @relation("AgencyClients", fields: [parentAgencyId], references: [id], onDelete: SetNull)
   clients        Org[]   @relation("AgencyClients")
 
-  // White-label branding (used by the reseller layer in M8; nullable now).
+  // White-label branding (reseller layer, M8). When set, the client's users see
+  // this brand instead of "The Warm Sweep".
   brandName    String?
   brandLogoUrl String?
   brandColor   String?
   fromDomain   String?
+
+  // M8 per-seat billing (what the agency charges this client).
+  clientPriceCents Int    @default(0)
+  seats            Int    @default(1)
+  billingStatus    String @default("active") // active | trial | past_due | paused
 
   // CAN-SPAM: a real physical mailing address shown in every email (enforced M5).
   mailingAddress String?
