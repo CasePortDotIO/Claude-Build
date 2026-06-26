@@ -4,6 +4,8 @@ import {
   buildDraftSystemPrompt,
   buildDraftUserPrompt,
   draftToolSchema,
+  buildReplySystemPrompt,
+  buildReplyUserPrompt,
   buildVoiceLearnSystemPrompt,
   buildVoiceLearnUserPrompt,
   voiceToolSchema,
@@ -13,6 +15,7 @@ import type {
   DraftInput,
   DraftResult,
   DraftVariantOut,
+  ReplyDraftInput,
   VoiceLearnInput,
   VoiceLearnResult,
 } from "@/lib/ai/types";
@@ -53,6 +56,30 @@ class AnthropicProvider implements LLMProvider {
       userContent: buildDraftUserPrompt(input),
       tool: draftToolSchema(input.variantCount),
       maxTokens: 2000,
+    });
+    return {
+      variants: out.variants.map((v) => ({
+        angle: v.angle,
+        subject: v.subject,
+        body: v.body,
+        openingLine: v.opening_line,
+        confidence: clamp01(v.confidence),
+        rationale: v.rationale,
+      })),
+      overallRationale: out.overall_rationale,
+      usage,
+      provider: this.name,
+      model: this.model,
+    };
+  }
+
+  async draftReply(input: ReplyDraftInput): Promise<DraftResult> {
+    const { input: out, usage } = await callToolUse<RawDraftToolInput>({
+      model: this.model,
+      system: buildReplySystemPrompt(input),
+      userContent: buildReplyUserPrompt(input),
+      tool: draftToolSchema(input.variantCount),
+      maxTokens: 1500,
     });
     return {
       variants: out.variants.map((v) => ({
@@ -162,6 +189,47 @@ export class StubProvider implements LLMProvider {
       overallRationale:
         "Deterministic stub draft grounded only in this lead's recorded memory. Set ANTHROPIC_API_KEY to use Claude for richer copy.",
       usage,
+      provider: this.name,
+      model: this.model,
+    };
+  }
+
+  async draftReply(input: ReplyDraftInput): Promise<DraftResult> {
+    const { lead, voice, operatorName, optOutLine, availability } = input;
+    const greeting = voice.greeting.replace(/\{\{\s*firstName\s*\}\}/g, lead.firstName || "there");
+    const signOff = voice.signOff.replace(/\{\{\s*operator\s*\}\}/g, operatorName);
+
+    const offer = availability.length
+      ? `I've got ${availability.slice(0, 2).join(" or ")} open — would either work?`
+      : `I could do tomorrow afternoon or Thursday morning — would either of those work for a quick 15 minutes?`;
+
+    const count = Math.max(1, Math.min(2, input.variantCount));
+    const variants: DraftVariantOut[] = [];
+    const bodyA = [greeting, ``, `Great to hear back from you — glad the timing works.`, ``, offer, ``, signOff, ``, optOutLine].join("\n");
+    variants.push({
+      angle: "book-the-call",
+      subject: "Re: let's find a time",
+      body: bodyA,
+      openingLine: "Great to hear back from you — glad the timing works.",
+      confidence: 0.82,
+      rationale: "They replied positively; offer concrete times to convert to a booking.",
+    });
+    if (count === 2) {
+      const bodyB = [greeting, ``, `Love it. Rather than go back and forth, want me to send a quick booking link so you can grab whatever slot suits you?`, ``, signOff, ``, optOutLine].join("\n");
+      variants.push({
+        angle: "send-link",
+        subject: "Re: easiest way to grab a time",
+        body: bodyB,
+        openingLine: "Love it.",
+        confidence: 0.74,
+        rationale: "Lower-friction alternative: let them self-serve a time.",
+      });
+    }
+
+    return {
+      variants,
+      overallRationale: "Deterministic stub reply that responds to the lead and moves toward a booked call.",
+      usage: estimateUsage(buildReplyUserPrompt(input), variants.map((v) => v.body).join("\n")),
       provider: this.name,
       model: this.model,
     };

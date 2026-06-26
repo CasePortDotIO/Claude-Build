@@ -8,14 +8,19 @@ import { Sidebar } from "@/components/nav/Sidebar";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireOrg();
   const db = orgScoped(ctx.orgId);
-  const [org, pendingDrafts] = await Promise.all([
+  const [org, pendingDrafts, needsReview] = await Promise.all([
     prisma.org.findUnique({ where: { id: ctx.orgId }, select: { name: true } }),
     db.draft.count({ where: { status: "PENDING_APPROVAL" } }),
+    prisma.conversation.count({ where: { orgId: ctx.orgId, status: "NEEDS_REVIEW" } }),
   ]);
 
   return (
     <div className="flex min-h-screen w-full bg-parchment text-ink">
-      <Sidebar userName={ctx.name ?? ctx.email} orgName={org?.name ?? "Workspace"} badges={{ pendingDrafts }} />
+      <Sidebar
+        userName={ctx.name ?? ctx.email}
+        orgName={org?.name ?? "Workspace"}
+        badges={{ pendingDrafts, needsReview }}
+      />
       <main className="ws-scroll flex min-w-0 flex-1 flex-col">{children}</main>
     </div>
   );

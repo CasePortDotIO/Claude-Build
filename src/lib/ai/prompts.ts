@@ -1,4 +1,4 @@
-import type { DraftInput, VoiceLearnInput } from "@/lib/ai/types";
+import type { DraftInput, ReplyDraftInput, VoiceLearnInput } from "@/lib/ai/types";
 
 /**
  * Prompt construction for the draft + voice-learning steps. Kept separate from
@@ -96,6 +96,44 @@ export function draftToolSchema(variantCount: number) {
       required: ["overall_rationale", "variants"],
     },
   } as const;
+}
+
+// ── Reply / negotiation drafting ─────────────────────────────────────────────
+export function buildReplySystemPrompt(input: ReplyDraftInput): string {
+  const { voice, operatorName } = input;
+  return [
+    `You are handling an ongoing email reply for "The Warm Sweep" on behalf of`,
+    `${operatorName}. A prior cold lead has REPLIED. Your job is to move the`,
+    `conversation gently toward a booked call — without being pushy.`,
+    ``,
+    `Write in their voice: ${voice.tone}; ${voice.sentenceLength}; emoji ${voice.emojiUse}.`,
+    `Signature move: ${voice.signatureMove}.`,
+    ``,
+    `Rules:`,
+    `- Respond directly to what they actually said. Don't restart the pitch.`,
+    `- One clear next step. If you have real availability, offer specific times.`,
+    `- If they sound hesitant, lower friction; never guilt or pressure them.`,
+    `- Ground everything in the thread + memory. Never invent facts.`,
+    `- Include the one-line opt-out verbatim at the end.`,
+    ``,
+    `Return ${input.variantCount} reply variant(s) via submit_drafts.`,
+  ].join("\n");
+}
+
+export function buildReplyUserPrompt(input: ReplyDraftInput): string {
+  const lines: string[] = [];
+  lines.push(`Lead: ${input.lead.firstName ?? "(unknown)"}`);
+  if (input.lead.statedGoal) lines.push(`Their goal: ${input.lead.statedGoal}`);
+  lines.push(``, `Conversation so far:`);
+  for (const t of input.thread) lines.push(`${t.who === "operator" ? "You" : "Them"}: ${truncate(t.text, 300)}`);
+  lines.push(``, `Their latest reply (respond to THIS):`, truncate(input.theirReply, 600));
+  if (input.availability.length) {
+    lines.push(``, `Real availability you may offer: ${input.availability.join(", ")}`);
+  } else {
+    lines.push(``, `No calendar connected yet — propose a couple of times in words and ask what suits them.`);
+  }
+  lines.push(``, `One-line opt-out to include verbatim: "${input.optOutLine}"`);
+  return lines.join("\n");
 }
 
 export function buildVoiceLearnSystemPrompt(): string {

@@ -2,9 +2,25 @@ import { requireOrg } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { Topbar } from "@/components/nav/Topbar";
 import { ApprovalQueue, type DraftVM } from "@/components/approvals/ApprovalQueue";
+import { ReadyToSend, type ReadyItem } from "@/components/approvals/ReadyToSend";
 
 export default async function ApprovalsPage() {
   const ctx = await requireOrg();
+
+  // Approved-but-unsent drafts (the irreversible send step lives here).
+  const [readyDrafts, mailboxCount] = await Promise.all([
+    prisma.draft.findMany({
+      where: { orgId: ctx.orgId, status: "APPROVED", messages: { none: { direction: "OUTBOUND" } } },
+      orderBy: { approvedAt: "asc" },
+      include: { lead: { select: { firstName: true, lastName: true, email: true } } },
+    }),
+    prisma.mailbox.count({ where: { orgId: ctx.orgId, status: "CONNECTED" } }),
+  ]);
+  const readyItems: ReadyItem[] = readyDrafts.map((d) => ({
+    draftId: d.id,
+    leadName: [d.lead.firstName, d.lead.lastName].filter(Boolean).join(" ") || d.lead.email,
+    subject: d.finalSubject ?? "(no subject)",
+  }));
 
   // Include-heavy read: query directly but always scope by orgId.
   const drafts = await prisma.draft.findMany({
@@ -44,6 +60,7 @@ export default async function ApprovalsPage() {
           Every message waits for you. Edit, switch variants, approve, or reject — nothing leaves your mailbox
           without a click. (v1 default: preview &amp; approve.)
         </p>
+        <ReadyToSend items={readyItems} hasMailbox={mailboxCount > 0} />
         <ApprovalQueue drafts={vms} />
       </div>
     </>

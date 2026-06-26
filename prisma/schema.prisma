@@ -66,6 +66,11 @@ model Org {
   drafts           Draft[]
   agentRuns        AgentRun[]
 
+  // M3: mailboxes + messages + conversations
+  mailboxes     Mailbox[]
+  messages      Message[]
+  conversations Conversation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -174,6 +179,10 @@ model Lead {
   drafts           Draft[]
   memoryEmbeddings MemoryEmbedding[]
   agentRuns        AgentRun[]
+
+  // M3 relations
+  messages      Message[]
+  conversation  Conversation?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -355,6 +364,9 @@ model Draft {
   agentRunId String?
   agentRun   AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
 
+  // M3: the outbound message(s) produced when this draft was approved + sent.
+  messages Message[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -420,4 +432,147 @@ model AgentRun {
 
   @@index([orgId, createdAt])
   @@index([leadId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M3 — Mailboxes, messages, conversations (the send + reply loop)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum MailboxProviderKind {
+  GMAIL
+  MICROSOFT // stubbed until M7
+  SIMULATION // offline dev/demo mailbox — sends + replies are simulated
+}
+
+enum MailboxStatus {
+  CONNECTED
+  DISCONNECTED
+  PAUSED // auto-paused on bounce/complaint threshold (M5) or by the operator
+}
+
+// An operator's sending identity. Tokens are stored ENCRYPTED at rest
+// (AES-256-GCM via lib/crypto); plaintext never touches the DB.
+model Mailbox {
+  id       String              @id @default(cuid())
+  orgId    String
+  org      Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  provider MailboxProviderKind
+  email    String
+  status   MailboxStatus       @default(CONNECTED)
+
+  // Encrypted OAuth material (null for SIMULATION).
+  accessTokenEnc  String?
+  refreshTokenEnc String?
+  tokenExpiry     DateTime?
+  // For Gmail incremental sync (history API) / delta cursors.
+  syncCursor String?
+  lastSyncAt DateTime?
+
+  // Deliverability rails (full enforcement in M5; basic caps respected in M3).
+  dailyCap  Int      @default(40)
+  sentToday Int      @default(0)
+  capResetAt DateTime?
+
+  messages      Message[]
+  conversations Conversation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, email])
+  @@index([orgId])
+}
+
+enum MessageDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  BOUNCED
+  RECEIVED // inbound
+  FAILED
+}
+
+model Message {
+  id        String @id @default(cuid())
+  orgId     String
+  org       Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId    String
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  mailboxId String
+  mailbox   Mailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  direction MessageDirection
+  status    MessageStatus    @default(QUEUED)
+
+  // Threading + provider identifiers (Gmail messageId / threadId).
+  providerMessageId String?
+  threadId          String?
+  inReplyTo         String?
+
+  fromEmail String
+  toEmail   String
+  subject   String
+  body      String @db.Text
+
+  // Inbound classification (§6: parse out auto-replies + bounces).
+  isAutoReply Boolean @default(false)
+  isBounce    Boolean @default(false)
+  isOptOut    Boolean @default(false)
+
+  // For OUTBOUND, the approved draft this was sent from.
+  draftId String?
+  draft   Draft?  @relation(fields: [draftId], references: [id], onDelete: SetNull)
+
+  sentAt     DateTime?
+  receivedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([orgId, leadId])
+  @@index([conversationId])
+  @@index([threadId])
+}
+
+enum ConversationStatus {
+  ACTIVE // back-and-forth in progress
+  AWAITING_REPLY // we sent, waiting on them
+  NEEDS_REVIEW // a reply draft is queued for approval
+  BOOKED // call booked (M4)
+  CLOSED
+}
+
+// One email thread per lead. Powers the Conversations inbox + thread view.
+model Conversation {
+  id        String  @id @default(cuid())
+  orgId     String
+  org       Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId    String  @unique
+  lead      Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  mailboxId String
+  mailbox   Mailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+
+  threadId String?
+  subject  String
+  status   ConversationStatus @default(AWAITING_REPLY)
+
+  // Whether the agent auto-advances this thread (per-sequence "autonomous" flag,
+  // §3/§7). v1 default is false → reply drafts go to the approval queue.
+  autopilot Boolean @default(false)
+
+  lastInboundAt  DateTime?
+  lastOutboundAt DateTime?
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, status])
 }

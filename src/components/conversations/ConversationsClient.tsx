@@ -1,0 +1,190 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { simulateReplyAction } from "@/server/actions/mailbox";
+
+export interface ThreadMessage {
+  id: string;
+  direction: "OUTBOUND" | "INBOUND";
+  subject: string;
+  body: string;
+  when: string;
+  isAutoReply: boolean;
+  isBounce: boolean;
+}
+export interface ConversationVM {
+  id: string;
+  leadId: string;
+  leadName: string;
+  leadEmail: string;
+  initials: string;
+  status: string; // ConversationStatus
+  leadStatus: string;
+  lastSnippet: string;
+  when: string;
+  messages: ThreadMessage[];
+}
+
+const STATUS_TAG: Record<string, { label: string; cls: string }> = {
+  AWAITING_REPLY: { label: "Awaiting reply", cls: "text-ember bg-[rgba(232,116,59,0.1)]" },
+  NEEDS_REVIEW: { label: "Reply drafted · review", cls: "text-ember bg-[rgba(232,116,59,0.12)]" },
+  ACTIVE: { label: "Active", cls: "text-sweep bg-[rgba(27,122,87,0.08)]" },
+  BOOKED: { label: "Call booked", cls: "text-sweep bg-[rgba(27,122,87,0.1)]" },
+  CLOSED: { label: "Closed", cls: "text-muted-2 bg-line-2" },
+};
+
+export function ConversationsClient({ conversations }: { conversations: ConversationVM[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [activeId, setActiveId] = useState<string | null>(conversations[0]?.id ?? null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  if (conversations.length === 0) {
+    return (
+      <div className="rounded-xl2 border border-line bg-white p-12 text-center">
+        <p className="m-0 mb-2 font-heading text-[18px] font-semibold text-ink">No conversations yet</p>
+        <p className="m-0 text-[14px] text-muted">
+          Approve a draft and send it — the thread shows up here, and the agent handles the replies.
+        </p>
+      </div>
+    );
+  }
+
+  const active = conversations.find((c) => c.id === activeId) ?? conversations[0];
+
+  function simulate(kind: "positive" | "optout" | "bounce") {
+    startTransition(async () => {
+      const r = await simulateReplyAction({ leadId: active.leadId, kind });
+      setMsg(r.ok ? r.message ?? "Reply ingested" : r.error ?? "Error");
+      router.refresh();
+      setTimeout(() => setMsg(null), 4000);
+    });
+  }
+
+  return (
+    <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[1fr_1.5fr]">
+      {/* inbox */}
+      <div className="overflow-hidden rounded-xl2 border border-line bg-white">
+        <div className="border-b border-line-2 bg-cream-head px-5 py-4">
+          <p className="m-0 font-heading text-[15px] font-semibold text-ink">
+            Inbox <span className="font-medium text-muted-3">· AI-handled</span>
+          </p>
+        </div>
+        {conversations.map((c) => {
+          const on = c.id === active.id;
+          const tag = STATUS_TAG[c.status] ?? STATUS_TAG.ACTIVE;
+          return (
+            <button
+              key={c.id}
+              onClick={() => setActiveId(c.id)}
+              className={`flex w-full gap-3 border-b border-line-2 px-5 py-3.5 text-left last:border-b-0 ${on ? "bg-cream" : "hover:bg-cream-head"}`}
+            >
+              <div className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full bg-avatar font-heading text-[15px] font-semibold text-white">
+                {c.initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-0.5 flex items-center justify-between gap-2">
+                  <p className="m-0 truncate text-[14px] font-semibold text-ink">{c.leadName}</p>
+                  <span className="flex-none text-[11.5px] text-muted-3">{c.when}</span>
+                </div>
+                <p className="m-0 mb-1.5 truncate text-[13px] text-muted-2">{c.lastSnippet}</p>
+                <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${tag.cls}`}>{tag.label}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* thread */}
+      <div className="flex flex-col overflow-hidden rounded-xl2 border border-line bg-white">
+        <div className="flex items-center gap-3 border-b border-line-2 px-6 py-4">
+          <div className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full bg-avatar font-heading text-[15px] font-semibold text-white">
+            {active.initials}
+          </div>
+          <div className="flex-1">
+            <p className="m-0 font-heading text-[16px] font-semibold text-ink">{active.leadName}</p>
+            <p className="m-0 text-[12.5px] text-muted-2">Handled by your agent · {active.leadEmail}</p>
+          </div>
+          <span className="flex items-center gap-1.5 rounded-full bg-[rgba(27,122,87,0.08)] px-3 py-1.5 text-[12.5px] font-semibold text-sweep">
+            <span className="h-[7px] w-[7px] animate-wsPulse rounded-full bg-sweep" />
+            Auto-pilot
+          </span>
+        </div>
+
+        {/* messages */}
+        <div className="flex min-h-[300px] flex-col gap-3.5 bg-[#FBFAF7] p-6">
+          {active.messages.map((m) => {
+            const out = m.direction === "OUTBOUND";
+            return (
+              <div key={m.id} className="flex w-full flex-col">
+                <span className={`mb-1 text-[11px] font-semibold uppercase tracking-wide ${out ? "self-end text-sweep" : "text-muted-2"}`}>
+                  {out ? "Agent → lead" : m.isBounce ? "Bounce" : m.isAutoReply ? "Auto-reply" : "Lead → you"}
+                </span>
+                <div
+                  className={`max-w-[80%] whitespace-pre-line rounded-2xl px-4 py-3 text-[13.5px] leading-[1.55] ${
+                    out ? "self-end bg-sweep text-white" : "self-start border border-line bg-white text-ink-soft"
+                  }`}
+                >
+                  {m.body}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* footer: booked, needs-review, or controls */}
+        {active.status === "BOOKED" ? (
+          <Booked />
+        ) : active.status === "NEEDS_REVIEW" ? (
+          <div className="flex items-center gap-3 border-t border-line-2 bg-[#FBFAF7] px-6 py-4">
+            <span className="h-2 w-2 flex-none animate-wsPulse rounded-full bg-ember" />
+            <p className="m-0 flex-1 text-[13.5px] text-muted">The agent drafted a reply. Review it before it sends.</p>
+            <Link href="/approvals" className="rounded-lg bg-ember px-4 py-2 text-[13px] font-semibold text-white hover:bg-ember-hover">
+              Review in approvals →
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 border-t border-line-2 bg-[#FBFAF7] px-6 py-4">
+            <span className="text-[12.5px] text-muted-2">Demo the reply loop:</span>
+            <SimBtn disabled={pending} onClick={() => simulate("positive")}>Simulate positive reply</SimBtn>
+            <SimBtn disabled={pending} onClick={() => simulate("optout")}>Simulate opt-out</SimBtn>
+            <SimBtn disabled={pending} onClick={() => simulate("bounce")}>Simulate bounce</SimBtn>
+            {msg && <span className="text-[12px] text-sweep">{msg}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SimBtn({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-lg border border-line-3 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-muted hover:bg-cream disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Booked() {
+  return (
+    <div className="flex items-center gap-3 border-t border-[rgba(27,122,87,0.2)] bg-[#F6FBF8] px-6 py-4">
+      <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[9px] bg-sweep">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+      </div>
+      <div className="flex-1">
+        <p className="m-0 text-[14px] font-semibold text-ink">Call booked to your calendar</p>
+        <p className="m-0 text-[13px] text-sweep">Booking detection lands in M4.</p>
+      </div>
+      <span className="text-[12.5px] text-muted-2">You did nothing.</span>
+    </div>
+  );
+}

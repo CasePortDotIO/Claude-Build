@@ -4,6 +4,9 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { learnVoice } from "@/lib/agent/voice";
 import { generateDraftsForLead } from "@/lib/agent/draft";
+import { sendApprovedDraft } from "@/lib/agent/send";
+import { ingestInboundEmail } from "@/lib/agent/inbound";
+import { simulatedLeadReply } from "@/lib/mailbox/simulation";
 
 const prisma = new PrismaClient();
 
@@ -138,6 +141,53 @@ async function main() {
     });
     for (const lead of monroeNewLeads) {
       await generateDraftsForLead({ orgId: monroe.id, leadId: lead.id, operatorName: "Monroe Coaching" });
+    }
+  }
+
+  // ── M3: connect a simulated mailbox, send the approved drafts, simulate a reply
+  // so the Conversations screen is populated on first load.
+  const simEmail = "demo@monroe-coaching.sim";
+  const mailbox = await prisma.mailbox.upsert({
+    where: { orgId_email: { orgId: monroe.id, email: simEmail } },
+    update: { status: "CONNECTED" },
+    create: { orgId: monroe.id, email: simEmail, provider: "SIMULATION", status: "CONNECTED", dailyCap: 40 },
+  });
+
+  const noConversations = (await prisma.conversation.count({ where: { orgId: monroe.id } })) === 0;
+  if (noConversations) {
+    // Approve + send the two pending drafts (pick the highest-confidence variant).
+    const pending = await prisma.draft.findMany({
+      where: { orgId: monroe.id, status: "PENDING_APPROVAL" },
+      include: { variants: { orderBy: { confidence: "desc" } } },
+    });
+    for (const draft of pending) {
+      const best = draft.variants[0];
+      if (!best) continue;
+      await prisma.draft.update({
+        where: { id: draft.id },
+        data: { status: "APPROVED", selectedVariantId: best.id, finalSubject: best.subject, finalBody: best.body, approvedAt: new Date() },
+      });
+      await prisma.lead.update({ where: { id: draft.leadId }, data: { status: "SCHEDULED" } });
+      await sendApprovedDraft({ orgId: monroe.id, draftId: draft.id });
+    }
+
+    // Simulate a positive reply from the first lead (Dana) → agent drafts a reply.
+    const dana = await prisma.lead.findFirst({ where: { orgId: monroe.id, email: "dana.k@gmail.com" } });
+    const danaConvo = dana ? await prisma.conversation.findUnique({ where: { leadId: dana.id } }) : null;
+    if (dana && danaConvo) {
+      await ingestInboundEmail({
+        orgId: monroe.id,
+        mailboxId: mailbox.id,
+        email: {
+          providerMessageId: `seed-reply-${dana.id}`,
+          threadId: danaConvo.threadId ?? `simthread-${dana.id}`,
+          fromEmail: `${dana.firstName} <${dana.email}>`,
+          toEmail: simEmail,
+          subject: `Re: ${danaConvo.subject}`,
+          body: simulatedLeadReply({ firstName: dana.firstName, goal: dana.statedGoal, positive: true }),
+          receivedAt: new Date(),
+        },
+      });
     }
   }
 

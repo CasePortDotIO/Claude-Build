@@ -4,7 +4,7 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 
 - [x] **M1 — Foundation.** Schema + auth + multi-tenant org model + CSV import + lead table UI.
 - [x] **M2 — Memory & drafting.** Voice profile + memory tables/pgvector + Claude draft engine + Approval queue (render email, no real send).
-- [ ] **M3 — Send loop.** Gmail OAuth send + reply detection + agent state machine + Conversations UI.
+- [x] **M3 — Send loop.** Gmail OAuth send + reply detection + agent state machine + Conversations UI.
 - [ ] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
 - [ ] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view.
 - [ ] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
@@ -49,3 +49,21 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - **No API keys required to run.** Without `ANTHROPIC_API_KEY` the StubProvider writes real, memory-grounded copy; without `VOYAGE_API_KEY` the HashEmbedder gives deterministic, overlap-sensitive embeddings. Set the keys to switch to Claude + Voyage with zero code changes.
 - **Nothing sends.** Approval sets the lead to `SCHEDULED`; the actual Gmail send + reply detection is M3.
 - pgvector must be enabled (the M2 migration runs `CREATE EXTENSION IF NOT EXISTS vector`).
+
+## M3 file map (built)
+- `prisma/schema.prisma` — Mailbox (encrypted tokens, caps), Message (direction, threadId, auto-reply/bounce/opt-out flags), Conversation (per-lead thread, autopilot).
+- `src/lib/mailbox/{types,gmail,simulation,index}.ts` — `MailboxProvider` adapter; GmailProvider (Gmail API + OAuth) and SimulationProvider (offline); inbound classifier; token decryption.
+- `src/lib/agent/state-machine.ts` — explicit lead transition table + guards (`transition`, `canTransition`, terminal states).
+- `src/lib/agent/send.ts` — `sendApprovedDraft`/`sendAllApproved`: send via mailbox, open conversation, advance state, respect daily cap, refuse suppressed/terminal.
+- `src/lib/agent/inbound.ts` — `ingestInboundEmail`: classify, match (sender → thread fallback), advance; genuine reply → drafts a response (queued for approval); opt-out/bounce → suppress + terminal.
+- `src/lib/ai/{types,prompts,provider}.ts` — added `draftReply` (real + stub).
+- `src/server/actions/mailbox.ts` — connect simulation mailbox, send, simulate reply, sync Gmail.
+- `src/app/api/connections/gmail/{start,callback}` — OAuth flow; tokens encrypted at rest.
+- `src/app/(app)/{conversations,connections}/**`, components for both + Approvals "ready to send".
+- Tests: state-machine (legal/illegal/terminal/opt-out), send + reply loop (send, positive reply → NEGOTIATING + reply draft, opt-out → suppress, bounce via thread match, suppressed refused), inbound classifier.
+
+### M3 notes / what's stubbed
+- **Runs fully offline.** A SIMULATION mailbox sends without Google and inbound replies are injected via "Simulate reply" (positive / opt-out / bounce). Set `GOOGLE_CLIENT_ID`/`SECRET` to connect a real Gmail mailbox (tokens AES-256-GCM encrypted at rest); reply sync via the Gmail API.
+- **Approval still gates every send** (v1 default). Reply drafts also land in the approval queue; the per-conversation `autopilot` flag exists for the future autonomous path.
+- Booking detection + the "call booked" confirmation are **M4** (the Conversations footer shows the placeholder).
+- Daily send caps are respected here; full warmup/throttling + deliverability view are **M5**.

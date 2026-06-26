@@ -55,6 +55,23 @@ export interface DraftResult {
   model: string;
 }
 
+// A turn in the existing thread, oldest → newest.
+export interface ThreadTurn {
+  who: "operator" | "lead";
+  text: string;
+}
+
+export interface ReplyDraftInput {
+  lead: LeadMemory;
+  voice: VoiceProfileShape;
+  operatorName: string;
+  optOutLine: string;
+  thread: ThreadTurn[]; // the conversation so far
+  theirReply: string; // the latest inbound message we're responding to
+  availability: string[]; // real slots the agent may offer (empty if none yet)
+  variantCount: number; // 1–2
+}
+
 export interface VoiceLearnInput {
   samples: { subject?: string | null; body: string }[];
   operatorName: string;
@@ -71,6 +88,7 @@ export interface LLMProvider {
   readonly name: string;
   readonly model: string;
   draftReengagement(input: DraftInput): Promise<DraftResult>;
+  draftReply(input: ReplyDraftInput): Promise<DraftResult>;
   learnVoice(input: VoiceLearnInput): Promise<VoiceLearnResult>;
 }
 

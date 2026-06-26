@@ -11,10 +11,11 @@ time.
 
 ---
 
-## Status — Milestones 1 & 2 shipped ✅
+## Status — Milestones 1–3 shipped ✅
 
 **M1: Schema + auth + multi-tenant org model + CSV import + lead table UI.**
 **M2: Voice profile + memory/pgvector + Claude draft engine + Approval queue.**
+**M3: Mailbox send + reply detection + lead state machine + Conversations UI.**
 
 What works right now, end-to-end:
 
@@ -36,18 +37,24 @@ What works right now, end-to-end:
   every email, and **personalization from real memory only — never invented**.
   Every call is logged to `agent_runs` (provider, model, tokens, cost, latency).
 - **Approval queue** (v1 default = preview & approve): switch variants, edit,
-  approve / reject / **approve-all**. Approval moves the lead to `SCHEDULED` —
-  **nothing sends yet** (that's M3).
+  approve / reject / **approve-all**, then **send** from a connected mailbox.
+- **Send loop (M3).** Approved drafts send from the operator's own mailbox; the
+  agent opens a **Conversation**, watches for replies, **classifies** them
+  (genuine / auto-reply / **bounce** / **opt-out**), and on a genuine reply
+  drafts a response that goes back to the approval queue. An explicit **lead
+  state machine** drives `NEW → … → SENT → AWAITING_REPLY → REPLIED →
+  NEGOTIATING → BOOKED` with hard branches for bounce/opt-out.
+- **Mailboxes.** Real **Gmail** via OAuth (tokens **AES-256-GCM encrypted at
+  rest**) + a **simulation mailbox** that runs the whole send/reply loop offline.
 - **Runs with or without API keys.** No `ANTHROPIC_API_KEY` → a deterministic
   StubProvider writes real, memory-grounded copy; no `VOYAGE_API_KEY` → a
-  deterministic local embedder. Add the keys to switch to Claude + Voyage with
-  zero code changes.
+  deterministic local embedder; no Google creds → the simulation mailbox. Add
+  the keys to switch to Claude + Voyage + real Gmail with zero code changes.
 
 ### What's stubbed / still to come
 
 | Area | Milestone |
 | --- | --- |
-| Gmail OAuth send + reply detection + agent state machine + Conversations UI | M3 |
 | Cal.com booking + booking detection + Command Center KPIs/activity feed | M4 |
 | Compliance rails (opt-out, suppression enforcement, caps, warmup) + Deliverability view | M5 |
 | Self-improvement reflection job + "what it taught itself" log + A/B | M6 |
@@ -55,7 +62,7 @@ What works right now, end-to-end:
 | Reseller / white-label roll-up screens | M8 |
 
 The nav shows later screens marked **SOON** so the structure is locked now.
-**Real sending is intentionally absent** until M3 — approval is the terminal step today.
+**Every send is still gated by approval** (v1 default) — booking detection + KPIs land in M4.
 
 ---
 
@@ -116,11 +123,17 @@ Sign in as each to *see* tenant isolation: neither org can see the other's leads
 5. **Leads** → *Generate drafts for N eligible* (or per-lead in the drawer). The
    agent grounds each draft in that lead's memory and queues it.
 6. **Approvals** → review variants, edit, **approve / reject / approve-all**.
-   Approving moves the lead to `SCHEDULED`. (Sending is M3 — nothing leaves a
-   mailbox yet.) Opted-out / suppressed leads are refused a draft entirely.
+   Opted-out / suppressed leads are refused a draft entirely.
+7. **Connections** → the seed connects a **simulated mailbox** (or connect Gmail
+   if you set `GOOGLE_CLIENT_ID/SECRET`). On **Approvals**, the approved drafts
+   show under **“ready to send” → Send**.
+8. **Conversations** → the sent threads appear (Dana already replied in the seed).
+   Use **Simulate positive reply / opt-out / bounce** to watch the agent classify
+   the reply, advance the lead, and draft a response back into the approval queue.
+   Opt-out and bounce instantly suppress the lead.
 
 > Sign in as `marco@apexfit.co` to confirm isolation: Apex sees none of Monroe's
-> leads, drafts, voice, or memory.
+> leads, drafts, voice, memory, mailboxes, or conversations.
 
 ---
 
