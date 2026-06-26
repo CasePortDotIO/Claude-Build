@@ -81,6 +81,9 @@ model Org {
   insights Insight[]
   learning OrgLearning?
 
+  // M7: lead source integrations (importers behind the LeadSource adapter)
+  leadSources LeadSourceConnection[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -752,4 +755,43 @@ model OrgLearning {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M7 — Lead source integrations (importers behind the LeadSource adapter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum LeadSourceKind {
+  CSV
+  HUBSPOT
+  GOOGLE_SHEETS
+  MAILCHIMP
+  KAJABI
+}
+
+enum LeadSourceStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+// A connected importer. The api key/token is ENCRYPTED at rest; `config` holds
+// provider-specific settings (sheet id, Mailchimp list id, Mailchimp dc, etc.).
+model LeadSourceConnection {
+  id       String           @id @default(cuid())
+  orgId    String
+  org      Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  provider LeadSourceKind
+  status   LeadSourceStatus @default(CONNECTED)
+
+  apiKeyEnc String?
+  config    Json? // { sheetId?, listId?, dc?, subdomain? }
+
+  lastSyncAt   DateTime?
+  lastImported Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, provider])
+  @@index([orgId])
 }

@@ -2,9 +2,11 @@ import type { Mailbox } from "@prisma/client";
 import type { MailboxContext, MailboxProvider } from "@/lib/mailbox/types";
 import { GmailProvider } from "@/lib/mailbox/gmail";
 import { SimulationProvider } from "@/lib/mailbox/simulation";
+import { MicrosoftGraphProvider, hasMicrosoftOAuth } from "@/lib/mailbox/microsoft";
 import { decryptSecret } from "@/lib/crypto";
 
 export * from "@/lib/mailbox/types";
+export { hasMicrosoftOAuth };
 
 export function hasGoogleOAuth(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -18,7 +20,7 @@ export function getMailboxProvider(kind: "GMAIL" | "MICROSOFT" | "SIMULATION"): 
     case "SIMULATION":
       return new SimulationProvider();
     case "MICROSOFT":
-      throw new Error("Microsoft Graph mailbox lands in M7.");
+      return new MicrosoftGraphProvider();
   }
 }
 

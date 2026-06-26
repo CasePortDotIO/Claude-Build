@@ -8,7 +8,7 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - [x] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
 - [x] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view. **← v1 (M1–M5) acceptance complete.**
 - [x] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
-- [ ] **M7 — More integrations.** Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.
+- [x] **M7 — More integrations.** Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.
 - [ ] **M8 — Reseller/white-label.** Agency roll-up + per-client branding + per-seat billing fields.
 
 ## Confirmed stack decisions
@@ -116,3 +116,18 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - **Guardrails:** reflection only ever proposes opener/send-time/follow-up changes (a closed enum) — never the sending identity or compliance logic (§8/§13). Nothing auto-applies; every change is operator apply/veto and logged with the justifying metric.
 - **No opens:** there's no tracking pixel, so rollups measure replies + bookings (the outcomes that matter), not opens.
 - The nightly job runs via the cron route in prod (Vercel Cron / Inngest); in the app there's a manual "Run reflection" trigger.
+
+## M7 file map (built)
+- `prisma/schema.prisma` — LeadSourceConnection (provider, encrypted key, config).
+- `src/lib/import/ingest.ts` — shared `ingestLeads` pipeline (prior-contact gate + suppression/dup filter + audit) extracted from the CSV action; CSV + every source funnel through it.
+- `src/lib/leadsource/{types,providers,sample,index}.ts` — `LeadSource` adapter; real HubSpot / Google Sheets / Mailchimp / Kajabi adapters + deterministic sample data + factory + `pullFromSource` (live if keyed, else sample).
+- `src/lib/mailbox/microsoft.ts` — Microsoft Graph mailbox (OAuth, sendMail, fetch replies) wired into `getMailboxProvider(MICROSOFT)`; OAuth routes under `/api/connections/microsoft/*`.
+- `src/lib/calendar/calendly.ts` — Calendly provider (availability + link-based booking via webhook) wired into `getCalendarProvider(CALENDLY)`.
+- `src/server/actions/leadsource.ts` — connect/disconnect a source, import-from-source.
+- `src/components/connections/LeadSourcesSection.tsx` + Connections page — connect cards (key form or sample) + Import; Microsoft 365 OAuth card; Calendly card.
+- Tests: lead-source normalization + sample data + factory/liveness; DB-backed shared-ingest (gate refusal, sample import, suppression/dup filtering); M7 provider wiring (MS Graph auth URL + factory routing, Calendly empty-without-key).
+
+### M7 notes / what's stubbed
+- **Same gate for every source.** Whether leads come from CSV, HubSpot, Sheets, Mailchimp, or Kajabi, they pass through one `ingestLeads` path — prior-contact attestation, suppression + dedupe, audit. New sources can't bypass it.
+- **Runs offline.** Connect a source with **no API key** → deterministic **sample** contacts so the import flow is demoable; add a key (+ config like list/sheet/subdomain id) to go live, zero code changes.
+- **Microsoft 365** needs `MICROSOFT_CLIENT_ID/SECRET` (OAuth, tokens encrypted) — same pattern as Gmail. **Calendly** is scheduling-link-first: the agent offers slots and the invitee self-books (captured by the Cal.com-style webhook); direct server booking is link-based.

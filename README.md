@@ -19,6 +19,7 @@ time.
 **M4: Cal.com booking + booking detection + Command Center KPIs/activity feed.**
 **M5: Compliance rails (opt-out, suppression, CAN-SPAM, caps, warmup) + Deliverability.**
 **M6: Self-improvement — nightly reflection, "what it taught itself" log, A/B holdout.**
+**M7: Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.**
 
 > **v1 acceptance:** create an org → import prior leads → the agent drafts a
 > personalized re-engagement email grounded in real memory → approve/edit →
@@ -83,11 +84,18 @@ What works right now, end-to-end:
   improvement is **measured, not asserted**. The Command Center's "agent updated
   itself" card shows the latest applied change.
 
+- **More integrations (M7), all behind the adapter interfaces.** A new
+  **`LeadSource`** interface adds **HubSpot / Google Sheets / Mailchimp / Kajabi**
+  importers — every one funnels through the *same* prior-contact gate + suppression
+  filtering as CSV (one `ingestLeads` pipeline). **Microsoft 365 / Outlook** (Graph)
+  joins Gmail behind `MailboxProvider`; **Calendly** joins Cal.com behind
+  `CalendarProvider`. Connect with a key for live data, or with none for sample
+  contacts — zero code changes.
+
 ### What's still to come
 
 | Area | Milestone |
 | --- | --- |
-| Microsoft Graph, Calendly, HubSpot/Sheets/Mailchimp/Kajabi importers | M7 |
 | Reseller / white-label roll-up screens | M8 |
 
 The nav shows later screens marked **SOON** so the structure is locked now.

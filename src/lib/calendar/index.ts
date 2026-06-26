@@ -2,6 +2,7 @@ import type { CalendarConnection } from "@prisma/client";
 import type { CalendarContext, CalendarProvider } from "@/lib/calendar/types";
 import { CalcomProvider, LinkCalendarProvider } from "@/lib/calendar/calcom";
 import { SimulationCalendarProvider } from "@/lib/calendar/simulation";
+import { CalendlyProvider } from "@/lib/calendar/calendly";
 import { decryptSecret } from "@/lib/crypto";
 
 export * from "@/lib/calendar/types";
@@ -15,7 +16,7 @@ export function getCalendarProvider(kind: "CALCOM" | "CALENDLY" | "SIMULATION" |
     case "LINK":
       return new LinkCalendarProvider();
     case "CALENDLY":
-      throw new Error("Calendly lands in M7.");
+      return new CalendlyProvider();
   }
 }
 

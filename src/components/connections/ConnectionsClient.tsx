@@ -27,11 +27,13 @@ export interface CalendarVM {
 export function ConnectionsClient({
   mailboxes,
   googleConfigured,
+  microsoftConfigured,
   calendar,
   slackConfigured,
 }: {
   mailboxes: MailboxVM[];
   googleConfigured: boolean;
+  microsoftConfigured: boolean;
   calendar: CalendarVM | null;
   slackConfigured: boolean;
 }) {
@@ -90,9 +92,17 @@ export function ConnectionsClient({
           )}
         </Card>
 
-        {/* Microsoft (stub, M7) */}
-        <Card mono="M" monoBg="#0078d4" name="Microsoft 365" desc="Outlook send & reply detection" status="Lands in M7">
-          <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Soon</span>
+        {/* Microsoft 365 (M7) */}
+        <Card mono="M" monoBg="#0078d4" name="Microsoft 365" desc="Outlook send & reply detection" status={statusFor(mailboxes, "MICROSOFT")}>
+          {microsoftConfigured ? (
+            <a href="/api/connections/microsoft/start" className="rounded-lg bg-ember px-4 py-2 text-[13px] font-semibold text-white hover:bg-ember-hover">
+              Connect
+            </a>
+          ) : (
+            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Set MICROSOFT_CLIENT_ID/SECRET to enable">
+              Needs OAuth keys
+            </span>
+          )}
         </Card>
       </div>
 
@@ -136,8 +146,8 @@ export function ConnectionsClient({
             {calConnected ? "Reconnect (sim)" : "Connect (sim)"}
           </button>
         </Card>
-        <Card mono="◷" monoBg="#0a1f3c" name="Calendly" desc="Scheduling & intake" status="Lands in M7">
-          <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Soon</span>
+        <Card mono="◷" monoBg="#0a1f3c" name="Calendly" desc="Offer slots; invitee self-books (webhook)" status={calConnected && calendar?.provider === "CALENDLY" ? "Connected" : "Use the booking link below"}>
+          <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Link-based</span>
         </Card>
       </div>
       <div className="mb-7 rounded-xl2 border border-line bg-white p-4">

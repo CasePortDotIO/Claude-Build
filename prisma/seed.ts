@@ -263,6 +263,13 @@ async function main() {
     if (shift) await applyInsight(monroe.id, shift.id, jessica.id);
   }
 
+  // ── M7: connect a sample HubSpot source for Monroe (demoable offline).
+  await prisma.leadSourceConnection.upsert({
+    where: { orgId_provider: { orgId: monroe.id, provider: "HUBSPOT" } },
+    update: { status: "CONNECTED" },
+    create: { orgId: monroe.id, provider: "HUBSPOT", status: "CONNECTED", config: {} },
+  });
+
   console.log("Seed complete:");
   console.log("  Agency:  Delegate and Done");
   console.log("  Client A: Monroe Coaching  — login jessica@monroe.coach / warmsweep123  (4 leads)");
