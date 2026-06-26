@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #faf7f2;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Warm scrollbar to match the mockup's .ws-scroll. */
+.ws-scroll::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.ws-scroll::-webkit-scrollbar-thumb {
+  background: #d8d3c8;
+  border-radius: 6px;
+}
+.ws-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes wsRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ws-rise {
+  animation: wsRise 0.5s ease both;
+}

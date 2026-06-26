@@ -1,0 +1,24 @@
+# Local Postgres with pgvector for The Warm Sweep.
+# pgvector ships unused until M2 (semantic memory), but the image has it ready.
+#   docker compose up -d
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: warmsweep-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: warmsweep
+      POSTGRES_PASSWORD: warmsweep
+      POSTGRES_DB: warmsweep
+    ports:
+      - "5432:5432"
+    volumes:
+      - warmsweep_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warmsweep -d warmsweep"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  warmsweep_pgdata:

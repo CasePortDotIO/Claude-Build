@@ -1,0 +1,236 @@
+// The Warm Sweep — Prisma schema.
+//
+// Design notes:
+//  - Multi-tenant from day one. Every tenant-owned row carries `orgId` and is
+//    only ever read through the org-scoped client in src/lib/tenancy.ts.
+//  - Org model supports the reseller hierarchy now (Agency -> Client) even
+//    though the reseller UI lands in M8 — cheaper to model the bones once.
+//  - `Lead` carries the agent-facing fields (originalInquiry, statedGoal,
+//    consent, status) so the state machine in M3 doesn't need a re-migration.
+//  - pgvector is enabled from M2; no vector columns exist yet in M1.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenancy
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum OrgType {
+  AGENCY // a reseller that owns Client orgs
+  CLIENT // an operator workspace that owns leads
+}
+
+enum Role {
+  AGENCY_ADMIN // manages an agency and all its client orgs
+  CLIENT_ADMIN // manages a single client org
+  MEMBER // operates within a client org
+}
+
+model Org {
+  id        String  @id @default(cuid())
+  type      OrgType @default(CLIENT)
+  name      String
+  slug      String  @unique
+
+  // Reseller hierarchy. A CLIENT org may belong to an AGENCY org.
+  parentAgencyId String?
+  parentAgency   Org?    @relation("AgencyClients", fields: [parentAgencyId], references: [id], onDelete: SetNull)
+  clients        Org[]   @relation("AgencyClients")
+
+  // White-label branding (used by the reseller layer in M8; nullable now).
+  brandName    String?
+  brandLogoUrl String?
+  brandColor   String?
+  fromDomain   String?
+
+  // CAN-SPAM: a real physical mailing address shown in every email (enforced M5).
+  mailingAddress String?
+
+  memberships  Membership[]
+  leads        Lead[]
+  leadImports  LeadImport[]
+  suppressions SuppressionEntry[]
+  auditLogs    AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentAgencyId])
+  @@index([type])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String? // null for OAuth-only users (added later)
+  emailVerified DateTime?
+  image         String?
+
+  memberships Membership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A user's membership in an org, with a role. The join is the unit of access.
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId  String
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role   Role   @default(CLIENT_ADMIN)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Leads
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The per-lead state machine. M1 only sets NEW; later milestones drive it.
+enum LeadStatus {
+  NEW
+  RESEARCHED
+  DRAFTED
+  AWAITING_APPROVAL
+  SCHEDULED
+  SENT
+  AWAITING_REPLY
+  REPLIED
+  NEGOTIATING
+  BOOKED // terminal (success)
+  // branches
+  BOUNCED
+  OPTED_OUT
+  DO_NOT_CONTACT
+  COOLED // re-queue
+  CLOSED_LOST
+}
+
+// Lawful basis for contact (GDPR/CASL). The import gate requires a prior
+// relationship — this records why contacting the lead is permitted.
+enum ConsentBasis {
+  PRIOR_INQUIRY // they reached out to us before (default for reactivation)
+  EXISTING_CUSTOMER
+  EXPLICIT_CONSENT
+  LEGITIMATE_INTEREST
+  UNKNOWN
+}
+
+model Lead {
+  id    String @id @default(cuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // identity
+  email     String
+  firstName String?
+  lastName  String?
+  company   String?
+  phone     String?
+
+  // agent-facing memory seeds (populated by the research step in M2/M3)
+  originalInquiry String? @db.Text // what they first asked about
+  statedGoal      String? @db.Text // the goal the agent infers/records
+  toneRead        String? // e.g. "warm, direct"
+  bestChannel     String? // e.g. "email"
+
+  status LeadStatus @default(NEW)
+
+  // compliance
+  consentBasis ConsentBasis @default(PRIOR_INQUIRY)
+  region       String? // for region-specific rules (GDPR/CASL)
+  priorContact Boolean      @default(true) // import gate must attest this
+  lastTouchAt  DateTime? // last time we contacted them (for cooldown)
+  coolDownUntil DateTime?
+
+  source     String? // "csv", "hubspot", ...
+  importId   String?
+  import     LeadImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A lead's email is unique within an org (dedupe on import), not globally.
+  @@unique([orgId, email])
+  @@index([orgId, status])
+  @@index([importId])
+}
+
+// A batch record of one import, retained for audit + the column mapping used.
+model LeadImport {
+  id    String @id @default(cuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name        String // sweep name, e.g. "Cold leads · Q1 2024"
+  source      String  @default("csv")
+  fileName    String?
+  columnMap   Json // { field: csvHeader } mapping chosen in the UI
+  totalRows   Int     @default(0)
+  importedRows Int    @default(0)
+  skippedRows Int     @default(0)
+  priorContactAttested Boolean @default(false) // M5/§9 gate
+
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compliance + audit (tables exist now; enforcement wired in M5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum SuppressionReason {
+  OPTED_OUT
+  BOUNCED
+  COMPLAINED
+  MANUAL
+  DO_NOT_CONTACT
+}
+
+// Global per-org suppression list. An email here must never be contacted.
+model SuppressionEntry {
+  id     String @id @default(cuid())
+  orgId  String
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email  String
+  reason SuppressionReason @default(MANUAL)
+  note   String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, email])
+  @@index([orgId])
+}
+
+// Append-only audit trail. The agent's own decisions log to a separate
+// agent_runs table introduced in M2; this is for human/system actions.
+model AuditLog {
+  id        String  @id @default(cuid())
+  orgId     String
+  org       Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actorId   String? // user id, or null for system
+  action    String // e.g. "lead.import", "org.create"
+  targetType String?
+  targetId  String?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+}
