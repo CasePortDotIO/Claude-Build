@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
-import { transition, TERMINAL_STATES } from "@/lib/agent/state-machine";
+import { transition } from "@/lib/agent/state-machine";
+import { assertContactable, ComplianceError, complianceFooter, withComplianceFooter, unsubscribeUrl } from "@/lib/compliance";
+import { effectiveDailyCap } from "@/lib/compliance/caps";
 import type { Mailbox } from "@prisma/client";
 
 export class SendError extends Error {
@@ -10,18 +12,22 @@ export class SendError extends Error {
   }
 }
 
-/** Reset a mailbox's daily counter if the window has rolled over. */
+/** Reset a mailbox's daily + hourly counters if their windows have rolled over. */
 async function ensureCapWindow(mailbox: Mailbox): Promise<Mailbox> {
   const now = new Date();
+  const data: { sentToday?: number; capResetAt?: Date; sentThisHour?: number; hourResetAt?: Date } = {};
   if (!mailbox.capResetAt || mailbox.capResetAt < now) {
     const next = new Date(now);
-    next.setHours(24, 0, 0, 0); // reset at midnight
-    return prisma.mailbox.update({
-      where: { id: mailbox.id },
-      data: { sentToday: 0, capResetAt: next },
-    });
+    next.setHours(24, 0, 0, 0);
+    data.sentToday = 0;
+    data.capResetAt = next;
   }
-  return mailbox;
+  if (!mailbox.hourResetAt || mailbox.hourResetAt < now) {
+    data.sentThisHour = 0;
+    data.hourResetAt = new Date(now.getTime() + 3_600_000);
+  }
+  if (Object.keys(data).length === 0) return mailbox;
+  return prisma.mailbox.update({ where: { id: mailbox.id }, data });
 }
 
 /**
@@ -44,21 +50,39 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
   if (!draft) throw new SendError("No approved draft found to send.");
   const lead = draft.lead;
 
-  // Compliance rail: never send to a terminal/blocked lead.
-  if (TERMINAL_STATES.has(lead.status)) {
-    throw new SendError(`Lead is ${lead.status} — sending is blocked by compliance rails.`);
+  // Compliance rail: suppression + opt-out + DNC + terminal — single gate.
+  try {
+    await assertContactable(orgId, lead.email, lead.status);
+  } catch (e) {
+    if (e instanceof ComplianceError) throw new SendError(e.message);
+    throw e;
   }
-  const suppressed = await prisma.suppressionEntry.findUnique({
-    where: { orgId_email: { orgId, email: lead.email } },
-  });
-  if (suppressed) throw new SendError(`Lead is on the suppression list (${suppressed.reason}); cannot send.`);
+  if (lead.status !== "SCHEDULED") {
+    throw new SendError(`Lead must be SCHEDULED to send (is ${lead.status}). Approve the draft first.`);
+  }
+
+  // CAN-SPAM: a real physical mailing address is required in every email.
+  const org = await prisma.org.findUniqueOrThrow({ where: { id: orgId }, select: { name: true, brandName: true, mailingAddress: true } });
+  if (!org.mailingAddress) {
+    throw new SendError("Set your physical mailing address (Connections) before sending — required by CAN-SPAM.");
+  }
+  const brand = org.brandName || org.name;
 
   let mailbox = await prisma.mailbox.findFirst({ where: { orgId, status: "CONNECTED" }, orderBy: { createdAt: "asc" } });
   if (!mailbox) throw new SendError("No connected mailbox. Connect one under Connections first.");
   mailbox = await ensureCapWindow(mailbox);
-  if (mailbox.sentToday >= mailbox.dailyCap) {
-    throw new SendError(`Daily send cap reached for ${mailbox.email} (${mailbox.dailyCap}/day). Try again tomorrow.`);
+
+  const dailyLimit = effectiveDailyCap(mailbox);
+  if (mailbox.sentToday >= dailyLimit) {
+    throw new SendError(`Daily send cap reached for ${mailbox.email} (${dailyLimit}/day${dailyLimit < mailbox.dailyCap ? ", warmup" : ""}). Try again tomorrow.`);
   }
+  if (mailbox.sentThisHour >= mailbox.hourlyCap) {
+    throw new SendError(`Hourly send cap reached for ${mailbox.email} (${mailbox.hourlyCap}/hr). It'll resume shortly.`);
+  }
+
+  // Append the CAN-SPAM footer (unsubscribe link + physical address).
+  const footer = complianceFooter({ orgId, email: lead.email, mailingAddress: org.mailingAddress, brand });
+  const compliantBody = withComplianceFooter(draft.finalBody ?? "", footer);
 
   // Existing conversation (thread) for this lead, if any.
   const existing = await prisma.conversation.findUnique({ where: { leadId: lead.id } });
@@ -67,13 +91,11 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
   const sent = await provider.send(mailboxContext(mailbox), {
     to: lead.email,
     subject: draft.finalSubject ?? "",
-    body: draft.finalBody ?? "",
+    body: compliantBody,
     threadId: existing?.threadId ?? null,
+    listUnsubscribeUrl: unsubscribeUrl(orgId, lead.email),
   });
 
-  if (lead.status !== "SCHEDULED") {
-    throw new SendError(`Lead must be SCHEDULED to send (is ${lead.status}). Approve the draft first.`);
-  }
   const nowSent = transition("SCHEDULED", "SEND"); // → SENT
   const awaiting = transition(nowSent, "DELIVERED"); // → AWAITING_REPLY
 
@@ -105,14 +127,17 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
         fromEmail: mailbox!.email,
         toEmail: lead.email,
         subject: draft.finalSubject ?? "",
-        body: draft.finalBody ?? "",
+        body: compliantBody,
         draftId: draft.id,
         sentAt: new Date(),
       },
     });
 
     await tx.lead.update({ where: { id: lead.id }, data: { status: awaiting, lastTouchAt: new Date() } });
-    await tx.mailbox.update({ where: { id: mailbox!.id }, data: { sentToday: { increment: 1 } } });
+    await tx.mailbox.update({
+      where: { id: mailbox!.id },
+      data: { sentToday: { increment: 1 }, sentThisHour: { increment: 1 }, sentTotal: { increment: 1 } },
+    });
     await tx.auditLog.create({
       data: { orgId, action: "message.send", targetType: "Lead", targetId: lead.id, metadata: { draftId: draft.id, provider: mailbox!.provider } },
     });

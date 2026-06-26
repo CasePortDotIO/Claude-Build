@@ -7,6 +7,7 @@ import { buildOptOutLine } from "@/lib/agent/draft";
 import { transition, canTransition } from "@/lib/agent/state-machine";
 import { availabilityLabels } from "@/lib/agent/booking";
 import { storeMemory } from "@/lib/memory";
+import { autoPauseDecision } from "@/lib/compliance/caps";
 import type { ThreadTurn, VoiceProfileShape } from "@/lib/ai/types";
 
 export interface IngestResult {
@@ -77,17 +78,19 @@ export async function ingestInboundEmail(opts: {
     },
   });
 
-  // ── Bounce: hard stop + suppress ──
+  // ── Bounce: hard stop + suppress + deliverability accounting ──
   if (flags.isBounce) {
     await applyTerminal(lead.id, "BOUNCE", "BOUNCED", conversation.id, "CLOSED");
     await suppress(orgId, lead.email, "BOUNCED");
+    await recordBounceAndMaybePause(mailboxId);
     return { outcome: "bounce", leadId: lead.id, conversationId: conversation.id };
   }
 
-  // ── Opt-out: honor instantly + permanently ──
+  // ── Opt-out: honor instantly + permanently (a "stop" reply is also a complaint) ──
   if (flags.isOptOut) {
     await applyTerminal(lead.id, "OPT_OUT", "OPTED_OUT", conversation.id, "CLOSED");
     await suppress(orgId, lead.email, "OPTED_OUT");
+    await recordComplaintAndMaybePause(mailboxId);
     return { outcome: "opt_out", leadId: lead.id, conversationId: conversation.id };
   }
 
@@ -207,6 +210,26 @@ async function applyTerminal(
   const to = canTransition(lead.status, event) ? transition(lead.status, event) : forced;
   await prisma.lead.update({ where: { id: leadId }, data: { status: to } });
   await prisma.conversation.update({ where: { id: conversationId }, data: { status: convoStatus } });
+}
+
+// Deliverability accounting: increment the counter, then auto-pause the mailbox
+// if its bounce/complaint rate crosses the threshold (§9). Protects sender rep.
+async function recordBounceAndMaybePause(mailboxId: string) {
+  const mb = await prisma.mailbox.update({ where: { id: mailboxId }, data: { bounceCount: { increment: 1 } } });
+  const decision = autoPauseDecision(mb);
+  if (decision.pause && mb.status === "CONNECTED") {
+    await prisma.mailbox.update({ where: { id: mailboxId }, data: { status: "PAUSED", pausedReason: decision.reason } });
+    await prisma.auditLog.create({ data: { orgId: mb.orgId, action: "mailbox.autopause", targetType: "Mailbox", targetId: mailboxId, metadata: { reason: decision.reason } } });
+  }
+}
+
+async function recordComplaintAndMaybePause(mailboxId: string) {
+  const mb = await prisma.mailbox.update({ where: { id: mailboxId }, data: { complaintCount: { increment: 1 } } });
+  const decision = autoPauseDecision(mb);
+  if (decision.pause && mb.status === "CONNECTED") {
+    await prisma.mailbox.update({ where: { id: mailboxId }, data: { status: "PAUSED", pausedReason: decision.reason } });
+    await prisma.auditLog.create({ data: { orgId: mb.orgId, action: "mailbox.autopause", targetType: "Mailbox", targetId: mailboxId, metadata: { reason: decision.reason } } });
+  }
 }
 
 async function suppress(orgId: string, email: string, reason: "BOUNCED" | "OPTED_OUT") {

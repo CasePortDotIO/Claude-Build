@@ -478,10 +478,24 @@ model Mailbox {
   syncCursor String?
   lastSyncAt DateTime?
 
-  // Deliverability rails (full enforcement in M5; basic caps respected in M3).
+  // Deliverability rails (§9). Effective daily cap = min(dailyCap, warmup ramp).
   dailyCap  Int      @default(40)
   sentToday Int      @default(0)
   capResetAt DateTime?
+
+  // Hourly throttle (human-like pacing).
+  hourlyCap    Int       @default(8)
+  sentThisHour Int       @default(0)
+  hourResetAt  DateTime?
+
+  // Domain warmup: gradual volume ramp for new sending domains.
+  warmupStartedAt DateTime?
+
+  // Bounce/complaint tracking → auto-pause over threshold.
+  sentTotal      Int @default(0)
+  bounceCount    Int @default(0)
+  complaintCount Int @default(0)
+  pausedReason   String?
 
   messages      Message[]
   conversations Conversation[]

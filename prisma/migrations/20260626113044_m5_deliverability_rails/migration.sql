@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Mailbox" ADD COLUMN     "bounceCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "complaintCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "hourResetAt" TIMESTAMP(3),
+ADD COLUMN     "hourlyCap" INTEGER NOT NULL DEFAULT 8,
+ADD COLUMN     "pausedReason" TEXT,
+ADD COLUMN     "sentThisHour" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "sentTotal" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "warmupStartedAt" TIMESTAMP(3);

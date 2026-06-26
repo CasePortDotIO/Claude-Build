@@ -33,7 +33,7 @@ describe("send + reply loop", () => {
   }
 
   beforeAll(async () => {
-    const org = await prisma.org.create({ data: { name: `Org ${tag}`, slug: `org-${tag}`, type: "CLIENT" } });
+    const org = await prisma.org.create({ data: { name: `Org ${tag}`, slug: `org-${tag}`, type: "CLIENT", mailingAddress: "1 Test St, Austin TX 78701" } });
     orgId = org.id;
     const mb = await prisma.mailbox.create({
       data: { orgId, email: `demo@${tag}.sim`, provider: "SIMULATION", status: "CONNECTED", dailyCap: 5 },

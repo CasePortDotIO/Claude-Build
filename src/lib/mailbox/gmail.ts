@@ -72,12 +72,18 @@ export class GmailProvider implements MailboxProvider {
 
   async send(ctx: MailboxContext, email: OutboundEmail): Promise<SendResult> {
     // RFC 2822 message, base64url-encoded, via the Gmail send endpoint.
+    const unsubUrl = email.listUnsubscribeUrl;
+    // Derive the RFC 8058 one-click POST endpoint from the GET page URL.
+    const unsubPost = unsubUrl ? unsubUrl.replace("/u/", "/api/unsubscribe/") : "";
     const headers = [
       `From: ${ctx.email}`,
       `To: ${email.to}`,
       `Subject: ${email.subject}`,
       email.inReplyTo ? `In-Reply-To: ${email.inReplyTo}` : "",
       email.inReplyTo ? `References: ${email.inReplyTo}` : "",
+      // List-Unsubscribe enables the native one-click unsubscribe button (§9).
+      unsubUrl ? `List-Unsubscribe: <${unsubPost}>, <${unsubUrl}>` : "",
+      unsubUrl ? "List-Unsubscribe-Post: List-Unsubscribe=One-Click" : "",
       "Content-Type: text/plain; charset=UTF-8",
     ].filter(Boolean);
     const raw = `${headers.join("\r\n")}\r\n\r\n${email.body}`;

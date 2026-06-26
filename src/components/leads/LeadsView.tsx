@@ -6,6 +6,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { LEAD_STATUS_META } from "@/lib/types";
 import { generateDraftsAction } from "@/server/actions/agent";
+import { eraseLeadAction } from "@/server/actions/compliance";
 import type { LeadStatus } from "@prisma/client";
 
 // Serializable shape passed from the server page (no Date objects).
@@ -171,6 +172,32 @@ export function LeadsView({
                 pending={pending}
                 onGenerate={() => generate([selected.id])}
               />
+
+              {/* GDPR controls (§9): export + erasure */}
+              <div className="mt-5 flex items-center gap-3 border-t border-[#2a2f34] pt-4">
+                <a
+                  href={`/api/leads/${selected.id}/export`}
+                  className="text-[12px] font-semibold text-on-dark-soft hover:text-white hover:underline"
+                >
+                  Export data (JSON)
+                </a>
+                <button
+                  disabled={pending}
+                  onClick={() => {
+                    if (!confirm(`Permanently erase ${fullName(selected)} and all their data? Their email stays on do-not-contact.`)) return;
+                    startTransition(async () => {
+                      const r = await eraseLeadAction(selected.id);
+                      setMsg(r.ok ? r.message ?? "Erased" : r.error ?? "Error");
+                      setSelectedId(null);
+                      router.refresh();
+                      setTimeout(() => setMsg(null), 4000);
+                    });
+                  }}
+                  className="text-[12px] font-semibold text-[#e08b8b] hover:underline disabled:opacity-60"
+                >
+                  Erase (GDPR)
+                </button>
+              </div>
             </>
           ) : (
             <p className="m-0 text-[14px] text-on-dark-soft">Select a lead to see what the agent understands.</p>

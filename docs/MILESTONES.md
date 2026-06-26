@@ -6,7 +6,7 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - [x] **M2 — Memory & drafting.** Voice profile + memory tables/pgvector + Claude draft engine + Approval queue (render email, no real send).
 - [x] **M3 — Send loop.** Gmail OAuth send + reply detection + agent state machine + Conversations UI.
 - [x] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
-- [ ] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view.
+- [x] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view. **← v1 (M1–M5) acceptance complete.**
 - [ ] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
 - [ ] **M7 — More integrations.** Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.
 - [ ] **M8 — Reseller/white-label.** Agency roll-up + per-client branding + per-seat billing fields.
@@ -82,3 +82,21 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - **Books the call, offline or live.** With a simulated calendar the agent offers real-shaped slots and books on click; set a Cal.com API key + event type for real bookings, or a booking link for the self-serve + webhook path. Calendly is stubbed for M7.
 - **Notifications:** Slack webhook (encrypted) + an audit record on every booking. Email-on-booking reuses the mailbox in a later pass.
 - The Command Center "agent updated itself" self-improvement card (metric-justified changes + A/B) is **M6**; today it surfaces the latest real agent activity and links to The Agent.
+
+## M5 file map (built)
+- `prisma/schema.prisma` — Mailbox warmup/caps/bounce fields (hourlyCap, sentTotal, bounceCount, complaintCount, warmupStartedAt, pausedReason); Org.slackWebhookEnc.
+- `src/lib/compliance/unsubscribe.ts` — HMAC one-click unsubscribe tokens (sign/verify/url).
+- `src/lib/compliance/index.ts` — `assertContactable` (single suppression/opt-out/DNC/terminal gate), CAN-SPAM footer (unsubscribe link + physical address).
+- `src/lib/compliance/caps.ts` — warmup ramp + effective cap, bounce/complaint rates, auto-pause decision.
+- `src/lib/compliance/gdpr.ts` — per-lead export + erasure (cascade + DO_NOT_CONTACT).
+- `src/lib/compliance/deliverability.ts` — sender-health score (from real signals), SPF/DMARC DNS check, mailbox health.
+- `src/app/u/[token]/page.tsx` + `src/app/api/unsubscribe/[token]/route.ts` — public one-click unsubscribe (GET page + RFC 8058 POST).
+- `src/app/api/leads/[id]/export/route.ts` — GDPR JSON download.
+- `src/server/actions/compliance.ts` — erase lead, suppress email, set mailing address, resume mailbox.
+- send pipeline now: contactability gate, requires mailing address, appends footer, sets List-Unsubscribe header, enforces effective daily + hourly caps; inbound bounce/opt-out increment counters and auto-pause over threshold.
+- `src/app/(app)/deliverability/**` — health gauge, inbox-placement estimate, auth checklist, mailbox caps/warmup, suppression list + manual suppress + resume; Leads drawer export/erase.
+- Tests: unsubscribe token round-trip + footer idempotency, warmup/cap/auto-pause math, and a DB-backed flow (contactability gate, CAN-SPAM address required, footer appended, GDPR erasure, bounce-threshold auto-pause).
+
+### M5 notes — v1 acceptance (M1–M5) is done
+- Acceptance path works end-to-end: create org → import prior leads → agent drafts grounded copy → approve/edit → send from a mailbox → reply comes back and the thread auto-advances → call booked to the calendar → all on the Command Center — with opt-outs, suppression, CAN-SPAM, and caps enforced throughout.
+- **Honest stubs:** DKIM can't be verified without the provider selector (shown as guidance); SPF/DMARC use a real DNS check when a sending domain is set, else guidance. Domain warmup uses a fixed ramp schedule. Inbox-placement is an estimate derived from the health score (no third-party seed-list test).

@@ -11,12 +11,19 @@ time.
 
 ---
 
-## Status — Milestones 1–4 shipped ✅
+## Status — v1 shipped ✅ (Milestones 1–5 = definition of done)
 
 **M1: Schema + auth + multi-tenant org model + CSV import + lead table UI.**
 **M2: Voice profile + memory/pgvector + Claude draft engine + Approval queue.**
 **M3: Mailbox send + reply detection + lead state machine + Conversations UI.**
 **M4: Cal.com booking + booking detection + Command Center KPIs/activity feed.**
+**M5: Compliance rails (opt-out, suppression, CAN-SPAM, caps, warmup) + Deliverability.**
+
+> **v1 acceptance:** create an org → import prior leads → the agent drafts a
+> personalized re-engagement email grounded in real memory → approve/edit →
+> send from your mailbox → a reply comes back and the thread auto-advances →
+> a call is booked to your calendar → see it all on the Command Center — with
+> opt-outs, suppression, and caps enforced the whole way.
 
 What works right now, end-to-end:
 
@@ -54,17 +61,23 @@ What works right now, end-to-end:
 - **Command Center, live.** Real KPIs — **recovered revenue**, calls booked,
   reply rate, active conversations — a 7-day reactivations chart, and a unified
   activity feed (sends / replies / bookings / agent runs).
+- **Compliance as hard rails (M5).** One-click unsubscribe (signed token, public
+  page + RFC 8058 one-click POST) honored instantly and permanently; a single
+  **contactability gate** (suppression + opt-out + DNC) on every draft and send;
+  **CAN-SPAM** footer (unsubscribe link + required physical address); **GDPR**
+  per-lead export + erasure; **domain warmup** ramp + per-mailbox daily/hourly
+  caps; **bounce/complaint auto-pause**. A **Deliverability** view shows a real
+  sender-health score, SPF/DMARC checks, caps/warmup, and the suppression list.
 - **Runs with or without API keys.** No `ANTHROPIC_API_KEY` → a deterministic
   StubProvider writes real, memory-grounded copy; no `VOYAGE_API_KEY` → a
   deterministic local embedder; no Google/Cal.com creds → the simulation
   mailbox + calendar. Add the keys to switch to Claude + Voyage + real Gmail +
   Cal.com with zero code changes.
 
-### What's stubbed / still to come
+### What's still to come
 
 | Area | Milestone |
 | --- | --- |
-| Compliance rails (opt-out, suppression enforcement, caps, warmup) + Deliverability view | M5 |
 | Self-improvement reflection job + "what it taught itself" log + A/B | M6 |
 | Microsoft Graph, Calendly, HubSpot/Sheets/Mailchimp/Kajabi importers | M7 |
 | Reseller / white-label roll-up screens | M8 |

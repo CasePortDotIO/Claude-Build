@@ -16,6 +16,8 @@ export interface OutboundEmail {
   // Threading: when replying within an existing thread.
   threadId?: string | null;
   inReplyTo?: string | null;
+  // RFC 8058 one-click unsubscribe target (§9). Set as List-Unsubscribe header.
+  listUnsubscribeUrl?: string | null;
 }
 
 export interface SendResult {

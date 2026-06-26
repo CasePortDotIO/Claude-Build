@@ -3,11 +3,9 @@ import { getLLMProvider } from "@/lib/ai/provider";
 import { retrieveSimilar } from "@/lib/memory";
 import { estimateCostUsd } from "@/lib/ai/config";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
+import { assertContactable, ComplianceError } from "@/lib/compliance";
 import type { DraftInput, VoiceProfileShape } from "@/lib/ai/types";
 import type { Lead } from "@prisma/client";
-
-// Statuses that make a lead ineligible for outreach (§9/§13 hard guardrail).
-const BLOCKED_STATUSES = new Set(["OPTED_OUT", "DO_NOT_CONTACT", "BOUNCED", "BOOKED"]);
 
 export class DraftGuardError extends Error {
   constructor(message: string) {
@@ -43,14 +41,12 @@ export async function generateDraftsForLead(opts: {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
   if (!lead) throw new DraftGuardError("Lead not found in this workspace.");
 
-  if (BLOCKED_STATUSES.has(lead.status)) {
-    throw new DraftGuardError(`Lead is ${lead.status} — drafting is blocked by compliance rails.`);
-  }
-  const suppressed = await prisma.suppressionEntry.findUnique({
-    where: { orgId_email: { orgId, email: lead.email } },
-  });
-  if (suppressed) {
-    throw new DraftGuardError(`Lead is on the suppression list (${suppressed.reason}); cannot draft.`);
+  // Single contactability gate (suppression + opt-out + DNC + terminal).
+  try {
+    await assertContactable(orgId, lead.email, lead.status);
+  } catch (e) {
+    if (e instanceof ComplianceError) throw new DraftGuardError(e.message);
+    throw e;
   }
 
   // Load the org's voice profile (or defaults).

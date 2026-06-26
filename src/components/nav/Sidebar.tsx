@@ -32,7 +32,7 @@ const NAV: NavItem[] = [
   { href: "/conversations", label: "Conversations", badgeKey: "needsReview", icon: ICON(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />) },
   { href: "/agent", label: "The Agent", icon: ICON(<><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" /><circle cx="12" cy="12" r="3.2" /></>) },
   { href: "/connections", label: "Connections", icon: ICON(<path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />) },
-  { href: "/deliverability", label: "Deliverability", soon: true, icon: ICON(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />) },
+  { href: "/deliverability", label: "Deliverability", icon: ICON(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />) },
   { href: "/clients", label: "Clients", reseller: true, soon: true, icon: ICON(<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" />) },
 ];
 
