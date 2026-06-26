@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { simulateReplyAction } from "@/server/actions/mailbox";
+import { getAvailabilityAction, bookCallAction } from "@/server/actions/calendar";
 
 export interface ThreadMessage {
   id: string;
@@ -22,6 +23,7 @@ export interface ConversationVM {
   initials: string;
   status: string; // ConversationStatus
   leadStatus: string;
+  booking: { whenLabel: string; meetingUrl: string | null } | null;
   lastSnippet: string;
   when: string;
   messages: ThreadMessage[];
@@ -134,24 +136,28 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
           })}
         </div>
 
-        {/* footer: booked, needs-review, or controls */}
+        {/* footer: booked confirmation, review banner, or demo controls */}
         {active.status === "BOOKED" ? (
-          <Booked />
-        ) : active.status === "NEEDS_REVIEW" ? (
-          <div className="flex items-center gap-3 border-t border-line-2 bg-[#FBFAF7] px-6 py-4">
-            <span className="h-2 w-2 flex-none animate-wsPulse rounded-full bg-ember" />
-            <p className="m-0 flex-1 text-[13.5px] text-muted">The agent drafted a reply. Review it before it sends.</p>
-            <Link href="/approvals" className="rounded-lg bg-ember px-4 py-2 text-[13px] font-semibold text-white hover:bg-ember-hover">
-              Review in approvals →
-            </Link>
-          </div>
+          <Booked booking={active.booking} />
         ) : (
-          <div className="flex flex-wrap items-center gap-2 border-t border-line-2 bg-[#FBFAF7] px-6 py-4">
-            <span className="text-[12.5px] text-muted-2">Demo the reply loop:</span>
-            <SimBtn disabled={pending} onClick={() => simulate("positive")}>Simulate positive reply</SimBtn>
-            <SimBtn disabled={pending} onClick={() => simulate("optout")}>Simulate opt-out</SimBtn>
-            <SimBtn disabled={pending} onClick={() => simulate("bounce")}>Simulate bounce</SimBtn>
-            {msg && <span className="text-[12px] text-sweep">{msg}</span>}
+          <div className="flex flex-col gap-3 border-t border-line-2 bg-[#FBFAF7] px-6 py-4">
+            {active.status === "NEEDS_REVIEW" && (
+              <div className="flex items-center gap-3">
+                <span className="h-2 w-2 flex-none animate-wsPulse rounded-full bg-ember" />
+                <p className="m-0 flex-1 text-[13.5px] text-muted">The agent drafted a reply. Review it before it sends.</p>
+                <Link href="/approvals" className="rounded-lg bg-ember px-4 py-2 text-[13px] font-semibold text-white hover:bg-ember-hover">
+                  Review in approvals →
+                </Link>
+              </div>
+            )}
+            <BookControl leadId={active.leadId} pending={pending} startTransition={startTransition} onDone={(m) => { setMsg(m); router.refresh(); setTimeout(() => setMsg(null), 4000); }} />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12.5px] text-muted-2">Demo the reply loop:</span>
+              <SimBtn disabled={pending} onClick={() => simulate("positive")}>Positive reply</SimBtn>
+              <SimBtn disabled={pending} onClick={() => simulate("optout")}>Opt-out</SimBtn>
+              <SimBtn disabled={pending} onClick={() => simulate("bounce")}>Bounce</SimBtn>
+              {msg && <span className="text-[12px] text-sweep">{msg}</span>}
+            </div>
           </div>
         )}
       </div>
@@ -171,7 +177,67 @@ function SimBtn({ children, onClick, disabled }: { children: React.ReactNode; on
   );
 }
 
-function Booked() {
+function BookControl({
+  leadId,
+  pending,
+  startTransition,
+  onDone,
+}: {
+  leadId: string;
+  pending: boolean;
+  startTransition: (cb: () => Promise<void> | void) => void;
+  onDone: (msg: string) => void;
+}) {
+  const [slots, setSlots] = useState<{ startsAt: string; label: string }[] | null>(null);
+
+  function loadSlots() {
+    startTransition(async () => {
+      const r = await getAvailabilityAction();
+      if (r.ok && r.slots) setSlots(r.slots);
+      else onDone(r.error ?? "No calendar connected");
+    });
+  }
+  function book(startsAt: string) {
+    startTransition(async () => {
+      const r = await bookCallAction({ leadId, startsAt });
+      onDone(r.ok ? r.message ?? "Booked" : r.error ?? "Error");
+      setSlots(null);
+    });
+  }
+
+  if (!slots) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          disabled={pending}
+          onClick={loadSlots}
+          className="rounded-lg bg-sweep px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
+        >
+          Book the call →
+        </button>
+        <span className="text-[12px] text-muted-3">offers real availability from the connected calendar</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[12.5px] font-semibold text-ink">Pick a slot:</span>
+      {slots.map((s) => (
+        <button
+          key={s.startsAt}
+          disabled={pending}
+          onClick={() => book(s.startsAt)}
+          className="rounded-lg border border-sweep px-3 py-1.5 text-[12.5px] font-semibold text-sweep hover:bg-sweep hover:text-white disabled:opacity-60"
+        >
+          {s.label}
+        </button>
+      ))}
+      <button onClick={() => setSlots(null)} className="text-[12px] text-muted-3 hover:underline">cancel</button>
+    </div>
+  );
+}
+
+function Booked({ booking }: { booking: { whenLabel: string; meetingUrl: string | null } | null }) {
   return (
     <div className="flex items-center gap-3 border-t border-[rgba(27,122,87,0.2)] bg-[#F6FBF8] px-6 py-4">
       <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[9px] bg-sweep">
@@ -182,7 +248,15 @@ function Booked() {
       </div>
       <div className="flex-1">
         <p className="m-0 text-[14px] font-semibold text-ink">Call booked to your calendar</p>
-        <p className="m-0 text-[13px] text-sweep">Booking detection lands in M4.</p>
+        <p className="m-0 text-[13px] text-sweep">
+          {booking?.whenLabel ?? "Confirmed"}
+          {booking?.meetingUrl ? (
+            <>
+              {" · "}
+              <a href={booking.meetingUrl} className="underline" target="_blank" rel="noreferrer">join link</a>
+            </>
+          ) : null}
+        </p>
       </div>
       <span className="text-[12.5px] text-muted-2">You did nothing.</span>
     </div>

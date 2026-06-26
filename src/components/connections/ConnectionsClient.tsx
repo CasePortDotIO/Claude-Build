@@ -3,6 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { connectSimulationMailboxAction, disconnectMailboxAction } from "@/server/actions/mailbox";
+import {
+  connectSimulationCalendarAction,
+  setBookingLinkAction,
+  setSlackWebhookAction,
+} from "@/server/actions/calendar";
 
 export interface MailboxVM {
   id: string;
@@ -13,12 +18,39 @@ export interface MailboxVM {
   dailyCap: number;
 }
 
-export function ConnectionsClient({ mailboxes, googleConfigured }: { mailboxes: MailboxVM[]; googleConfigured: boolean }) {
+export interface CalendarVM {
+  provider: string;
+  status: string;
+  bookingLink: string | null;
+}
+
+export function ConnectionsClient({
+  mailboxes,
+  googleConfigured,
+  calendar,
+  slackConfigured,
+}: {
+  mailboxes: MailboxVM[];
+  googleConfigured: boolean;
+  calendar: CalendarVM | null;
+  slackConfigured: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [link, setLink] = useState(calendar?.bookingLink ?? "");
+  const [slack, setSlack] = useState("");
 
   const connected = mailboxes.filter((m) => m.status === "CONNECTED");
+  const calConnected = calendar?.status === "CONNECTED";
+
+  function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
+    startTransition(async () => {
+      const r = await fn();
+      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Error");
+      router.refresh();
+    });
+  }
 
   return (
     <div className="max-w-[1000px]">
@@ -90,6 +122,55 @@ export function ConnectionsClient({ mailboxes, googleConfigured }: { mailboxes: 
             </button>
           )}
         </Card>
+      </div>
+
+      <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Calendar &amp; booking</p>
+      <div className="mb-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <Card mono="C" monoBg="#1a1a1a" name="Cal.com" desc="Offer real slots & book the call" status={calConnected && calendar?.provider === "CALCOM" ? "Connected" : "Set CALCOM_* / API key"}>
+          <button
+            disabled={pending}
+            onClick={() => run(() => connectSimulationCalendarAction())}
+            className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+            title="Demo: connect a simulated calendar"
+          >
+            {calConnected ? "Reconnect (sim)" : "Connect (sim)"}
+          </button>
+        </Card>
+        <Card mono="◷" monoBg="#0a1f3c" name="Calendly" desc="Scheduling & intake" status="Lands in M7">
+          <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Soon</span>
+        </Card>
+      </div>
+      <div className="mb-7 rounded-xl2 border border-line bg-white p-4">
+        <p className="m-0 mb-2 text-[12.5px] font-semibold text-ink">Booking link fallback</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://cal.com/you/intro"
+            className="min-w-[260px] flex-1 rounded-lg border border-line-3 bg-white px-3 py-2 text-[13.5px] outline-none focus:border-sweep"
+          />
+          <button disabled={pending || !link} onClick={() => run(() => setBookingLinkAction({ bookingLink: link }))} className="rounded-lg border border-line-3 bg-white px-4 py-2 text-[13px] font-semibold text-muted hover:bg-cream disabled:opacity-50">
+            Save link
+          </button>
+        </div>
+      </div>
+
+      <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Notifications</p>
+      <div className="mb-7 rounded-xl2 border border-line bg-white p-4">
+        <p className="m-0 mb-2 text-[12.5px] font-semibold text-ink">
+          Slack — ping you the moment a call books {slackConfigured && <span className="text-sweep">· connected</span>}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={slack}
+            onChange={(e) => setSlack(e.target.value)}
+            placeholder="https://hooks.slack.com/services/…"
+            className="min-w-[260px] flex-1 rounded-lg border border-line-3 bg-white px-3 py-2 text-[13.5px] outline-none focus:border-sweep"
+          />
+          <button disabled={pending || !slack} onClick={() => run(() => setSlackWebhookAction({ webhook: slack }))} className="rounded-lg border border-line-3 bg-white px-4 py-2 text-[13px] font-semibold text-muted hover:bg-cream disabled:opacity-50">
+            Save webhook
+          </button>
+        </div>
       </div>
 
       {connected.length > 0 && (

@@ -5,6 +5,7 @@ import { estimateCostUsd } from "@/lib/ai/config";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
 import { buildOptOutLine } from "@/lib/agent/draft";
 import { transition, canTransition } from "@/lib/agent/state-machine";
+import { availabilityLabels } from "@/lib/agent/booking";
 import { storeMemory } from "@/lib/memory";
 import type { ThreadTurn, VoiceProfileShape } from "@/lib/ai/types";
 
@@ -123,11 +124,12 @@ async function draftReplyForApproval(opts: {
   const start = Date.now();
   const { orgId, leadId, conversationId, theirReply } = opts;
 
-  const [lead, org, profile, history] = await Promise.all([
+  const [lead, org, profile, history, availability] = await Promise.all([
     prisma.lead.findUniqueOrThrow({ where: { id: leadId } }),
     prisma.org.findUniqueOrThrow({ where: { id: orgId } }),
     prisma.voiceProfile.findUnique({ where: { orgId } }),
     prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: "asc" } }),
+    availabilityLabels(orgId),
   ]);
 
   const voice: VoiceProfileShape = profile
@@ -151,7 +153,7 @@ async function draftReplyForApproval(opts: {
     optOutLine: buildOptOutLine(),
     thread,
     theirReply,
-    availability: [], // real calendar slots arrive in M4
+    availability, // real calendar slots from the connected calendar (M4)
     variantCount: 2,
   });
 

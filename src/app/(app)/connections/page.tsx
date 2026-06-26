@@ -6,7 +6,11 @@ import { ConnectionsClient, type MailboxVM } from "@/components/connections/Conn
 
 export default async function ConnectionsPage() {
   const ctx = await requireOrg();
-  const mailboxes = await prisma.mailbox.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } });
+  const [mailboxes, calendars, org] = await Promise.all([
+    prisma.mailbox.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
+    prisma.calendarConnection.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
+    prisma.org.findUnique({ where: { id: ctx.orgId }, select: { slackWebhookEnc: true } }),
+  ]);
   const vms: MailboxVM[] = mailboxes.map((m) => ({
     id: m.id,
     email: m.email,
@@ -15,12 +19,18 @@ export default async function ConnectionsPage() {
     sentToday: m.sentToday,
     dailyCap: m.dailyCap,
   }));
+  const calendar = calendars.find((c) => c.status === "CONNECTED") ?? calendars[0];
 
   return (
     <>
       <Topbar title="Connections" />
       <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
-        <ConnectionsClient mailboxes={vms} googleConfigured={hasGoogleOAuth()} />
+        <ConnectionsClient
+          mailboxes={vms}
+          googleConfigured={hasGoogleOAuth()}
+          calendar={calendar ? { provider: calendar.provider, status: calendar.status, bookingLink: calendar.bookingLink } : null}
+          slackConfigured={Boolean(org?.slackWebhookEnc)}
+        />
       </div>
     </>
   );

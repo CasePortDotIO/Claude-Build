@@ -19,6 +19,7 @@ export default async function ConversationsPage() {
     include: {
       lead: { select: { firstName: true, lastName: true, email: true, status: true } },
       messages: { orderBy: { createdAt: "asc" } },
+      booking: { select: { startsAt: true, meetingUrl: true } },
     },
   });
 
@@ -33,6 +34,12 @@ export default async function ConversationsPage() {
       initials: initials(name),
       status: c.status,
       leadStatus: c.lead.status,
+      booking: c.booking
+        ? {
+            whenLabel: c.booking.startsAt.toLocaleString("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+            meetingUrl: c.booking.meetingUrl,
+          }
+        : null,
       lastSnippet: last ? last.body.replace(/\n+/g, " ").slice(0, 80) : c.subject,
       when: timeAgo(c.lastInboundAt ?? c.lastOutboundAt ?? c.updatedAt),
       messages: c.messages.map((m) => ({

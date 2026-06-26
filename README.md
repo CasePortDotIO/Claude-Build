@@ -11,11 +11,12 @@ time.
 
 ---
 
-## Status — Milestones 1–3 shipped ✅
+## Status — Milestones 1–4 shipped ✅
 
 **M1: Schema + auth + multi-tenant org model + CSV import + lead table UI.**
 **M2: Voice profile + memory/pgvector + Claude draft engine + Approval queue.**
 **M3: Mailbox send + reply detection + lead state machine + Conversations UI.**
+**M4: Cal.com booking + booking detection + Command Center KPIs/activity feed.**
 
 What works right now, end-to-end:
 
@@ -46,23 +47,30 @@ What works right now, end-to-end:
   NEGOTIATING → BOOKED` with hard branches for bounce/opt-out.
 - **Mailboxes.** Real **Gmail** via OAuth (tokens **AES-256-GCM encrypted at
   rest**) + a **simulation mailbox** that runs the whole send/reply loop offline.
+- **Books the call (M4).** A **CalendarProvider** adapter (Cal.com API + a
+  simulation calendar + a plain booking-link fallback) lets the agent offer
+  **real availability** in its replies and **book the call** → lead `BOOKED`,
+  with a Slack notification. A **Cal.com webhook** captures self-serve bookings.
+- **Command Center, live.** Real KPIs — **recovered revenue**, calls booked,
+  reply rate, active conversations — a 7-day reactivations chart, and a unified
+  activity feed (sends / replies / bookings / agent runs).
 - **Runs with or without API keys.** No `ANTHROPIC_API_KEY` → a deterministic
   StubProvider writes real, memory-grounded copy; no `VOYAGE_API_KEY` → a
-  deterministic local embedder; no Google creds → the simulation mailbox. Add
-  the keys to switch to Claude + Voyage + real Gmail with zero code changes.
+  deterministic local embedder; no Google/Cal.com creds → the simulation
+  mailbox + calendar. Add the keys to switch to Claude + Voyage + real Gmail +
+  Cal.com with zero code changes.
 
 ### What's stubbed / still to come
 
 | Area | Milestone |
 | --- | --- |
-| Cal.com booking + booking detection + Command Center KPIs/activity feed | M4 |
 | Compliance rails (opt-out, suppression enforcement, caps, warmup) + Deliverability view | M5 |
 | Self-improvement reflection job + "what it taught itself" log + A/B | M6 |
 | Microsoft Graph, Calendly, HubSpot/Sheets/Mailchimp/Kajabi importers | M7 |
 | Reseller / white-label roll-up screens | M8 |
 
 The nav shows later screens marked **SOON** so the structure is locked now.
-**Every send is still gated by approval** (v1 default) — booking detection + KPIs land in M4.
+**Every send is still gated by approval** (v1 default). Compliance rails + the Deliverability view land in M5.
 
 ---
 
@@ -127,10 +135,13 @@ Sign in as each to *see* tenant isolation: neither org can see the other's leads
 7. **Connections** → the seed connects a **simulated mailbox** (or connect Gmail
    if you set `GOOGLE_CLIENT_ID/SECRET`). On **Approvals**, the approved drafts
    show under **“ready to send” → Send**.
-8. **Conversations** → the sent threads appear (Dana already replied in the seed).
-   Use **Simulate positive reply / opt-out / bounce** to watch the agent classify
-   the reply, advance the lead, and draft a response back into the approval queue.
-   Opt-out and bounce instantly suppress the lead.
+8. **Conversations** → the sent threads appear (Dana already replied in the seed;
+   Phil's call is already **booked**). Use **Simulate positive reply / opt-out /
+   bounce** to watch the agent classify the reply, advance the lead, and draft a
+   response. **Book the call →** offers real slots; pick one to book → the thread
+   flips to "Call booked to your calendar".
+9. **Command Center** → recovered revenue, calls booked, reply rate, the 7-day
+   reactivations chart, and the live activity feed all reflect what just happened.
 
 > Sign in as `marco@apexfit.co` to confirm isolation: Apex sees none of Monroe's
 > leads, drafts, voice, memory, mailboxes, or conversations.

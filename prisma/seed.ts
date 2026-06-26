@@ -7,6 +7,7 @@ import { generateDraftsForLead } from "@/lib/agent/draft";
 import { sendApprovedDraft } from "@/lib/agent/send";
 import { ingestInboundEmail } from "@/lib/agent/inbound";
 import { simulatedLeadReply } from "@/lib/mailbox/simulation";
+import { bookCall } from "@/lib/agent/booking";
 
 const prisma = new PrismaClient();
 
@@ -82,27 +83,27 @@ async function main() {
   // naturally both in the "what the agent understands" drawer and when the
   // copy engine interpolates them into a sentence.
   const monroeLeads = [
-    { email: "dana.k@gmail.com", firstName: "Dana", lastName: "Klein", company: "Freelance", originalInquiry: "pricing your 1:1 coaching packages", statedGoal: "replacing your salary with coaching income", toneRead: "warm, hesitant", objections: ["worried about the time commitment"], region: "US-TX" },
-    { email: "phil@growthlab.io", firstName: "Phil", lastName: "Owens", company: "GrowthLab", originalInquiry: "the 8-week accountability program", statedGoal: "staying consistent through your launch", toneRead: "direct", objections: ["not sure it's worth the price"], region: "US-CA" },
-    { email: "sara.bennett@outlook.com", firstName: "Sara", lastName: "Bennett", company: "Bennett Studio", originalInquiry: "the group coaching cohort", statedGoal: "building a peer support circle", toneRead: "enthusiastic", objections: [], region: "US-NY" },
-    { email: "tom.h@protonmail.com", firstName: "Tom", lastName: "Harris", originalInquiry: "the goal-setting guide you downloaded", statedGoal: "getting unstuck after a career change", toneRead: "guarded", objections: ["went quiet, never replied"], region: "UK" },
+    { email: "dana.k@gmail.com", firstName: "Dana", lastName: "Klein", company: "Freelance", originalInquiry: "pricing your 1:1 coaching packages", statedGoal: "replacing your salary with coaching income", toneRead: "warm, hesitant", objections: ["worried about the time commitment"], region: "US-TX", dealValueCents: 300000 },
+    { email: "phil@growthlab.io", firstName: "Phil", lastName: "Owens", company: "GrowthLab", originalInquiry: "the 8-week accountability program", statedGoal: "staying consistent through your launch", toneRead: "direct", objections: ["not sure it's worth the price"], region: "US-CA", dealValueCents: 180000 },
+    { email: "sara.bennett@outlook.com", firstName: "Sara", lastName: "Bennett", company: "Bennett Studio", originalInquiry: "the group coaching cohort", statedGoal: "building a peer support circle", toneRead: "enthusiastic", objections: [], region: "US-NY", dealValueCents: 120000 },
+    { email: "tom.h@protonmail.com", firstName: "Tom", lastName: "Harris", originalInquiry: "the goal-setting guide you downloaded", statedGoal: "getting unstuck after a career change", toneRead: "guarded", objections: ["went quiet, never replied"], region: "UK", dealValueCents: 90000 },
   ];
   const apexLeads = [
-    { email: "rachel@fitmail.com", firstName: "Rachel", lastName: "Vance", originalInquiry: "the 90-day transformation", statedGoal: "getting in shape before your wedding", toneRead: "motivated", objections: [], region: "US-CO" },
-    { email: "deepa@startup.dev", firstName: "Deepa", lastName: "Rao", company: "Startup.dev", originalInquiry: "corporate wellness for your team", statedGoal: "lowering team burnout", toneRead: "analytical", objections: ["needs buy-in from leadership"], region: "US-WA" },
+    { email: "rachel@fitmail.com", firstName: "Rachel", lastName: "Vance", originalInquiry: "the 90-day transformation", statedGoal: "getting in shape before your wedding", toneRead: "motivated", objections: [], region: "US-CO", dealValueCents: 240000 },
+    { email: "deepa@startup.dev", firstName: "Deepa", lastName: "Rao", company: "Startup.dev", originalInquiry: "corporate wellness for your team", statedGoal: "lowering team burnout", toneRead: "analytical", objections: ["needs buy-in from leadership"], region: "US-WA", dealValueCents: 500000 },
   ];
 
   for (const l of monroeLeads) {
     await prisma.lead.upsert({
       where: { orgId_email: { orgId: monroe.id, email: l.email } },
-      update: { originalInquiry: l.originalInquiry, statedGoal: l.statedGoal, toneRead: l.toneRead, objections: l.objections },
+      update: { originalInquiry: l.originalInquiry, statedGoal: l.statedGoal, toneRead: l.toneRead, objections: l.objections, dealValueCents: l.dealValueCents },
       create: { ...l, orgId: monroe.id, source: "seed", consentBasis: "PRIOR_INQUIRY", priorContact: true, status: "NEW" },
     });
   }
   for (const l of apexLeads) {
     await prisma.lead.upsert({
       where: { orgId_email: { orgId: apex.id, email: l.email } },
-      update: { originalInquiry: l.originalInquiry, statedGoal: l.statedGoal, toneRead: l.toneRead, objections: l.objections },
+      update: { originalInquiry: l.originalInquiry, statedGoal: l.statedGoal, toneRead: l.toneRead, objections: l.objections, dealValueCents: l.dealValueCents },
       create: { ...l, orgId: apex.id, source: "seed", consentBasis: "PRIOR_INQUIRY", priorContact: true, status: "NEW" },
     });
   }
@@ -188,6 +189,26 @@ async function main() {
           receivedAt: new Date(),
         },
       });
+    }
+  }
+
+  // ── M4: connect a simulated calendar and book one call so the Command Center
+  // shows real recovered revenue + a booked conversation.
+  await prisma.calendarConnection.upsert({
+    where: { id: (await prisma.calendarConnection.findFirst({ where: { orgId: monroe.id } }))?.id ?? "none" },
+    update: {},
+    create: { orgId: monroe.id, provider: "SIMULATION", status: "CONNECTED", timezone: "UTC", bookingLink: "https://cal.com/monroe/intro" },
+  });
+
+  const noBookings = (await prisma.booking.count({ where: { orgId: monroe.id } })) === 0;
+  if (noBookings) {
+    // Phil accepted a time → book his call (Dana stays mid-negotiation for the demo).
+    const phil = await prisma.lead.findFirst({ where: { orgId: monroe.id, email: "phil@growthlab.io" } });
+    if (phil && phil.status !== "BOOKED") {
+      const start = new Date();
+      start.setDate(start.getDate() + 2);
+      start.setHours(9, 0, 0, 0);
+      await bookCall({ orgId: monroe.id, leadId: phil.id, startsAt: start, source: "agent" });
     }
   }
 

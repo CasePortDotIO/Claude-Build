@@ -1,5 +1,10 @@
 // Small, dependency-free humanizers shared across server + client components.
 
+export function formatMoney(cents: number): string {
+  const dollars = cents / 100;
+  return dollars.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
 export function timeAgo(date: Date | string | null): string {
   if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;

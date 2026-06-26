@@ -5,7 +5,7 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - [x] **M1 — Foundation.** Schema + auth + multi-tenant org model + CSV import + lead table UI.
 - [x] **M2 — Memory & drafting.** Voice profile + memory tables/pgvector + Claude draft engine + Approval queue (render email, no real send).
 - [x] **M3 — Send loop.** Gmail OAuth send + reply detection + agent state machine + Conversations UI.
-- [ ] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
+- [x] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
 - [ ] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view.
 - [ ] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
 - [ ] **M7 — More integrations.** Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.
@@ -65,5 +65,20 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 ### M3 notes / what's stubbed
 - **Runs fully offline.** A SIMULATION mailbox sends without Google and inbound replies are injected via "Simulate reply" (positive / opt-out / bounce). Set `GOOGLE_CLIENT_ID`/`SECRET` to connect a real Gmail mailbox (tokens AES-256-GCM encrypted at rest); reply sync via the Gmail API.
 - **Approval still gates every send** (v1 default). Reply drafts also land in the approval queue; the per-conversation `autopilot` flag exists for the future autonomous path.
-- Booking detection + the "call booked" confirmation are **M4** (the Conversations footer shows the placeholder).
 - Daily send caps are respected here; full warmup/throttling + deliverability view are **M5**.
+
+## M4 file map (built)
+- `prisma/schema.prisma` — CalendarConnection (encrypted key, eventTypeId, bookingLink), Booking (slot, attendee, providerEventId, valueCents, source), Lead.dealValueCents, Org.slackWebhookEnc.
+- `src/lib/calendar/{types,slots,simulation,calcom,index}.ts` — `CalendarProvider` adapter; Cal.com (API v2) + Simulation + LINK fallback; deterministic business-hour slot generator.
+- `src/lib/agent/booking.ts` — `bookCall` (create event, Booking, lead→BOOKED, conversation→BOOKED, value snapshot, notify), `availabilityLabels`.
+- `src/lib/notify.ts` — Slack webhook + audit notifier, fired on booking.
+- `src/lib/metrics.ts` — Command Center KPIs (recovered revenue, calls booked, reply rate, active convos), 7-day reactivations chart, unified activity feed.
+- `src/server/actions/calendar.ts` — connect Cal.com/simulated calendar, booking link, Slack webhook, get availability, book a call.
+- `src/app/api/webhooks/calcom/route.ts` — detect external bookings (match by attendee, dedupe on uid, capture slot).
+- `src/app/(app)/page.tsx` (real Command Center), Conversations booking control + confirmation, Connections calendar/Slack cards.
+- Tests: slot generation (future/weekday/format), booking pipeline (book→BOOKED + Booking + value + supersede draft, opt-out refused, double-book refused), KPI aggregation + org isolation.
+
+### M4 notes / what's stubbed
+- **Books the call, offline or live.** With a simulated calendar the agent offers real-shaped slots and books on click; set a Cal.com API key + event type for real bookings, or a booking link for the self-serve + webhook path. Calendly is stubbed for M7.
+- **Notifications:** Slack webhook (encrypted) + an audit record on every booking. Email-on-booking reuses the mailbox in a later pass.
+- The Command Center "agent updated itself" self-improvement card (metric-justified changes + A/B) is **M6**; today it surfaces the latest real agent activity and links to The Agent.

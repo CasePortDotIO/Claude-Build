@@ -1,21 +1,21 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/auth-helpers";
-import { orgScoped } from "@/lib/tenancy";
 import { Topbar } from "@/components/nav/Topbar";
+import { commandCenterKpis, reactivationsChart, activityFeed } from "@/lib/metrics";
+import { formatMoney, timeAgo } from "@/lib/format";
 
-// Command Center — M1 shows real lead counts from imports. The KPI row,
-// reactivations chart, activity feed, and "agent updated itself" card are
-// wired with live data in M4; here they're honest placeholders.
+// Command Center — real data (M4). KPI row, reactivations chart, live activity
+// feed, and the latest agent action. The "agent updated itself" self-improvement
+// card (with metric-justified changes) is M6; here we surface the latest real run.
 export default async function CommandCenter() {
   const ctx = await requireOrg();
-  const db = orgScoped(ctx.orgId);
-
-  const [total, awaiting, imports] = await Promise.all([
-    db.lead.count(),
-    db.lead.count({ where: { status: "NEW" } }),
-    db.leadImport.findMany({ orderBy: { createdAt: "desc" }, take: 1 }),
+  const [kpis, chart, activity] = await Promise.all([
+    commandCenterKpis(ctx.orgId),
+    reactivationsChart(ctx.orgId),
+    activityFeed(ctx.orgId),
   ]);
-  const lastImport = imports[0];
+
+  const maxBar = Math.max(1, ...chart.map((b) => b.value));
 
   return (
     <>
@@ -24,83 +24,112 @@ export default async function CommandCenter() {
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">
           <div className="relative overflow-hidden rounded-xl2 bg-sweep p-[22px] text-white">
-            <p className="m-0 mb-3 text-[12.5px] font-medium text-[#bfe6d5]">Leads in your sweep</p>
-            <p className="m-0 mb-2 font-heading text-[34px] font-semibold tracking-[-1px] tabular-nums">{total}</p>
-            <p className="m-0 text-[12.5px] text-[#bfe6d5]">imported &amp; ready to work</p>
-          </div>
-          <KpiCard label="Awaiting first touch" value={awaiting} sub="will be drafted in M2" />
-          <KpiCard label="Calls booked" value={0} sub="booking lands in M4" />
-          <KpiCard label="Reply rate" value="—" sub="sending lands in M3" />
-        </div>
-
-        {/* Milestone honesty card */}
-        <div className="mb-[22px] overflow-hidden rounded-xl2 bg-charcoal p-[26px] px-7">
-          <div className="mb-4 flex items-center gap-2.5">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5CA98A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />
-              <circle cx="12" cy="12" r="3.2" />
-            </svg>
-            <p className="m-0 font-sans text-[12px] font-semibold uppercase tracking-[1.8px] text-sweep-light">
-              Milestone 1 · foundation shipped
+            <p className="m-0 mb-3 text-[12.5px] font-medium text-[#bfe6d5]">Recovered revenue</p>
+            <p className="m-0 mb-2 font-heading text-[34px] font-semibold tracking-[-1px] tabular-nums">
+              {formatMoney(kpis.recoveredRevenueCents)}
             </p>
+            <p className="m-0 text-[12.5px] text-[#bfe6d5]">from {kpis.callsBooked} booked call{kpis.callsBooked === 1 ? "" : "s"}</p>
           </div>
-          <p className="m-0 mb-[18px] max-w-[760px] font-heading text-[20px] font-medium leading-[1.4] text-white">
-            Multi-tenant workspace, auth, and CSV import are live. Your leads are scoped to this org and ready.
-            Next, the agent learns your <span className="text-sweep-light">voice</span> and drafts re-engagement
-            emails grounded in real memory — for your approval.
-          </p>
-          <div className="flex flex-wrap gap-2.5">
-            <Chip>per-org isolation enforced</Chip>
-            <Chip>prior-contact gate on import</Chip>
-            <Chip>{lastImport ? `last sweep: ${lastImport.name}` : "no sweeps yet"}</Chip>
-            <Link
-              href="/leads"
-              className="ml-auto rounded-md bg-sweep-light px-3 py-1.5 text-[12.5px] font-semibold text-charcoal hover:bg-[#6dbd9b]"
-            >
-              View leads →
-            </Link>
-          </div>
+          <KpiCard label="Calls booked" value={kpis.callsBooked} sub="agent → calendar" />
+          <KpiCard
+            label="Reply rate"
+            value={`${Math.round(kpis.replyRate * 100)}%`}
+            sub={`${kpis.replied} of ${kpis.contacted} contacted`}
+          />
+          <KpiCard label="Active conversations" value={kpis.activeConversations} sub="the agent is handling" accent />
         </div>
 
-        {/* Always-on strip */}
-        <div className="flex flex-wrap items-center gap-3.5 rounded-xl2 border border-line bg-white px-5 py-[15px]">
-          <span className="inline-block h-[9px] w-[9px] flex-none animate-wsPulse rounded-full bg-sweep" />
-          <p className="m-0 min-w-[220px] flex-1 text-[14px] leading-[1.5] text-ink-soft">
-            {total > 0 ? (
-              <>
-                Your agent has <strong className="font-semibold text-ink">{total} prior contacts</strong> queued.
-                Drafting begins once you connect a voice profile in Milestone 2.
-              </>
+        {/* latest agent action */}
+        {activity.find((a) => a.kind === "agent") && (
+          <div className="mb-[22px] overflow-hidden rounded-xl2 bg-charcoal p-[26px] px-7">
+            <div className="mb-4 flex items-center gap-2.5">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5CA98A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />
+                <circle cx="12" cy="12" r="3.2" />
+              </svg>
+              <p className="m-0 font-sans text-[12px] font-semibold uppercase tracking-[1.8px] text-sweep-light">
+                The agent is working · {timeAgo(activity.find((a) => a.kind === "agent")!.at)}
+              </p>
+            </div>
+            <p className="m-0 mb-[18px] max-w-[760px] font-heading text-[20px] font-medium leading-[1.4] text-white">
+              Every email is grounded in real memory and waits for your approval. It revives cold leads, handles the
+              replies, and books the call — and it&apos;s learning your <span className="text-sweep-light">best send-times</span>{" "}
+              and <span className="text-sweep-light">openers</span> as outcomes come in.
+            </p>
+            <div className="flex flex-wrap gap-2.5">
+              <Chip>{kpis.callsBooked} booked</Chip>
+              <Chip>reply rate {Math.round(kpis.replyRate * 100)}%</Chip>
+              <Chip>self-improvement log → M6</Chip>
+              <Link href="/agent" className="ml-auto rounded-md bg-sweep-light px-3 py-1.5 text-[12.5px] font-semibold text-charcoal hover:bg-[#6dbd9b]">
+                See the agent →
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* split: chart + activity */}
+        <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1.45fr_1fr]">
+          <div className="rounded-xl2 border border-line bg-white p-6">
+            <div className="mb-5 flex items-baseline justify-between">
+              <p className="m-0 font-heading text-[16px] font-semibold text-ink">Reactivations</p>
+              <p className="m-0 text-[12.5px] text-muted-2">last 7 days · calls booked</p>
+            </div>
+            <div className="flex h-[170px] items-end gap-3">
+              {chart.map((b, i) => (
+                <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                  <span className="text-[12px] font-semibold text-sweep">{b.value || ""}</span>
+                  <div
+                    className="ws-bar w-full rounded-t-md bg-sweep"
+                    style={{ height: `${Math.max(4, (b.value / maxBar) * 130)}px`, opacity: b.value ? 1 : 0.25 }}
+                  />
+                  <span className="text-[11.5px] text-muted-3">{b.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl2 border border-line bg-white p-6">
+            <p className="m-0 mb-4 font-heading text-[16px] font-semibold text-ink">Live activity</p>
+            {activity.length === 0 ? (
+              <p className="m-0 text-[13.5px] text-muted">Nothing yet — generate drafts and send to see the feed fill up.</p>
             ) : (
-              <>Import a CSV of prior leads to wake your agent up.</>
+              <div className="flex flex-col">
+                {activity.map((a) => (
+                  <div key={a.id} className="flex gap-3 border-b border-line-2 py-2.5 last:border-b-0">
+                    <span className={`mt-1.5 h-2 w-2 flex-none rounded-full ${DOT[a.kind]}`} />
+                    <div className="min-w-0">
+                      <p className="m-0 text-[13.5px] leading-[1.4] text-ink-soft">{a.text}</p>
+                      <p className="m-0 text-[11.5px] text-muted-3">{timeAgo(a.at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </p>
-          <Link
-            href="/leads/import"
-            className="flex-none rounded-lg bg-ember px-4 py-2.5 font-heading text-[13px] font-semibold text-white hover:bg-ember-hover"
-          >
-            {total > 0 ? "Add another list" : "Start a sweep"}
-          </Link>
+          </div>
         </div>
       </div>
     </>
   );
 }
 
-function KpiCard({ label, value, sub }: { label: string; value: number | string; sub: string }) {
+const DOT: Record<string, string> = {
+  booking: "bg-sweep",
+  sent: "bg-avatar",
+  reply: "bg-ember",
+  agent: "bg-sweep-light",
+  opt_out: "bg-[#b43c3c]",
+};
+
+function KpiCard({ label, value, sub, accent }: { label: string; value: number | string; sub: string; accent?: boolean }) {
   return (
     <div className="rounded-xl2 border border-line bg-white p-[22px]">
       <p className="m-0 mb-3 text-[12.5px] font-medium text-[#888780]">{label}</p>
       <p className="m-0 mb-2 font-heading text-[34px] font-semibold tracking-[-1px] text-ink tabular-nums">{value}</p>
-      <p className="m-0 text-[12.5px] text-[#888780]">{sub}</p>
+      <p className={`m-0 text-[12.5px] ${accent ? "font-medium text-ember" : "text-[#888780]"}`}>{sub}</p>
     </div>
   );
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-md bg-charcoal-soft px-[11px] py-1.5 font-mono text-[12px] text-[#cdd2d6]">
-      {children}
-    </span>
-  );
+  return <span className="rounded-md bg-charcoal-soft px-[11px] py-1.5 font-mono text-[12px] text-[#cdd2d6]">{children}</span>;
 }

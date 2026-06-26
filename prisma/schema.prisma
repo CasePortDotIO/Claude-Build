@@ -71,6 +71,12 @@ model Org {
   messages      Message[]
   conversations Conversation[]
 
+  // M4: calendar + bookings
+  calendarConnections CalendarConnection[]
+  bookings            Booking[]
+  // Slack webhook for "call booked" notifications (§6); encrypted at rest.
+  slackWebhookEnc String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -183,6 +189,10 @@ model Lead {
   // M3 relations
   messages      Message[]
   conversation  Conversation?
+
+  // M4: estimated deal value (drives the "recovered revenue" KPI) + bookings
+  dealValueCents Int       @default(0)
+  bookings       Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -570,9 +580,84 @@ model Conversation {
   lastOutboundAt DateTime?
 
   messages Message[]
+  booking  Booking?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([orgId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M4 — Calendar connections + bookings (the "books the call" payoff)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CalendarProviderKind {
+  CALCOM
+  CALENDLY // stubbed until M7
+  SIMULATION // offline deterministic availability + booking
+  LINK // plain booking-link fallback (§6): we don't read events, just send the link
+}
+
+enum CalendarStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+// An org's scheduling connection. apiKey is ENCRYPTED at rest (lib/crypto).
+model CalendarConnection {
+  id       String               @id @default(cuid())
+  orgId    String
+  org      Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  provider CalendarProviderKind
+  status   CalendarStatus       @default(CONNECTED)
+
+  apiKeyEnc   String? // encrypted Cal.com API key (null for SIMULATION/LINK)
+  eventTypeId String? // Cal.com event type to book against
+  bookingLink String? // public booking URL (used by LINK + offered in copy)
+  timezone    String  @default("UTC")
+
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+enum BookingStatus {
+  HELD // tentative hold
+  CONFIRMED // the call is on the calendar
+  CANCELED
+  NO_SHOW
+}
+
+// A booked call — the terminal success of the agent loop.
+model Booking {
+  id                   String              @id @default(cuid())
+  orgId                String
+  org                  Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId               String
+  lead                 Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  conversationId       String?             @unique
+  conversation         Conversation?       @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  calendarConnectionId String?
+  calendarConnection   CalendarConnection? @relation(fields: [calendarConnectionId], references: [id], onDelete: SetNull)
+
+  status        BookingStatus @default(CONFIRMED)
+  startsAt      DateTime
+  endsAt        DateTime
+  attendeeEmail String
+  attendeeName  String?
+  meetingUrl    String?
+  providerEventId String? // Cal.com booking uid (for dedupe on webhook)
+  source        String        @default("agent") // "agent" | "link" | "webhook"
+
+  // Snapshot of the lead's value at booking time → recovered-revenue KPI.
+  valueCents Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([leadId])
 }
