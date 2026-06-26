@@ -30,12 +30,14 @@ export function ConnectionsClient({
   microsoftConfigured,
   calendar,
   slackConfigured,
+  calcomWebhookUrl,
 }: {
   mailboxes: MailboxVM[];
   googleConfigured: boolean;
   microsoftConfigured: boolean;
   calendar: CalendarVM | null;
   slackConfigured: boolean;
+  calcomWebhookUrl: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -163,6 +165,11 @@ export function ConnectionsClient({
             Save link
           </button>
         </div>
+        <p className="m-0 mb-1 mt-3 text-[12px] font-semibold text-ink">Cal.com webhook URL (paste into Cal.com → Webhooks)</p>
+        <code className="block truncate rounded-lg border border-line-2 bg-cream px-3 py-2 font-mono text-[11.5px] text-muted-2" title={calcomWebhookUrl}>
+          {calcomWebhookUrl}
+        </code>
+        <p className="m-0 mt-1 text-[11px] text-muted-3">Carries a per-workspace signed token — bookings are scoped to your org only.</p>
       </div>
 
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Notifications</p>

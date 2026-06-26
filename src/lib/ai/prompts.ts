@@ -37,6 +37,9 @@ export function buildDraftSystemPrompt(input: DraftInput): string {
     input.retiredPhrases && input.retiredPhrases.length
       ? `\nAvoid these opening lines — they under-performed: ${input.retiredPhrases.map((p) => `"${p}"`).join(", ")}.`
       : "",
+    input.promotedOpeners && input.promotedOpeners.length
+      ? `\nFavor this opening style — it out-performs: ${input.promotedOpeners.map((p) => `"${p}"`).join(", ")}. Lead with it when it fits the lead's goal.`
+      : "",
     ``,
     `Return ${input.variantCount} distinct variants via the submit_drafts tool,`,
     `each taking a different angle, each with a calibrated confidence (0–1).`,

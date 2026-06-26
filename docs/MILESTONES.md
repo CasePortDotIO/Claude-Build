@@ -148,3 +148,44 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - **Isolation holds through the reseller layer:** the roll-up only sums the agency's own clients; per-client memory, suppression, and metrics stay scoped. Verified live — Marco (a client user) is redirected from `/clients` and sees only his own brand.
 - **White-label is real:** client users see their org's brand name + color in the shell and the browser title, "powered by [agency]" — never "The Warm Sweep". Default branding only shows for the product's own/unbranded workspaces.
 - **Org switching** re-issues the session's active org but re-verifies membership server-side first; it can't be used to jump into a workspace you don't belong to.
+
+## QA hardening pass (post-M8)
+
+A full-codebase QA audit (agent loop + guardrails + UI wiring) ran after M8.
+Verdict: tests/typecheck/build all green; zero dead buttons; 4/5 guardrails were
+already enforced. Issues found and **fixed**:
+
+- **[HIGH] Cross-tenant Cal.com webhook.** `/api/webhooks/calcom` matched a lead
+  by bare email with no org scope and no signature → forged cross-tenant
+  bookings. Fixed: the webhook URL now carries a **per-org signed token**
+  (`src/lib/webhook-token.ts`); the route verifies it and scopes the lead lookup
+  to that org, with optional `CAL_WEBHOOK_SECRET` HMAC body verification. The URL
+  is surfaced in Connections. Verified live (no/forged token → 401; valid → 200,
+  scoped).
+- **[LOW] Booking skipped the suppression table.** `bookCall` checked lead status
+  but not `SuppressionEntry`. Now routed through the same `assertContactable`
+  gate as draft/send — one contactability gate everywhere.
+- **[loop] 3 of 4 learned knobs were stored but never consumed.** Fixed:
+  `promotedOpeners` now bias the draft engine (prompt + stub confidence);
+  `followUpGapDays` + `bestSendHour` now drive a new **re-engagement sweep**
+  (`src/lib/agent/maintenance.ts`) that dispatches the `COOL` event for leads
+  silent past the gap and times their re-touch to the learned send hour —
+  closing the silence/follow-up branch of the state machine (was never
+  dispatched). Runs on the nightly cron + a manual "Run reflection" trigger.
+- **[UI] Org switcher** had no pending/disabled state or error handling → added.
+- **[UI] `?status=` filter** could 500 on an invalid value → now ignored.
+
+Tests grew 90 → 97 (webhook token scoping, booking suppression gate, silence
+sweep + best-hour timing, promoted-opener bias).
+
+### Known honest limitations (documented, not bugs)
+- Sends are **immediate on approval**; there is no deferred scheduler, so
+  `bestSendHour` governs **re-engagement** timing (cooldown window) rather than
+  first-touch send time. A production deferred-send queue (Inngest) would consume
+  it for first sends too.
+- The `orgScoped()` choke point wraps the core models; other tables use explicit
+  `where: { orgId }` filters (all verified present). Broadening the wrapper is a
+  good future hardening step.
+- Guardrail "no invented facts" is prompt-enforced on the live-Claude path (the
+  stub is fact-safe by construction) plus the human approval gate; there's no
+  programmatic post-generation fact-checker yet.

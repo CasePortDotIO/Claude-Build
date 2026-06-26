@@ -2,6 +2,7 @@ import { requireOrg } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { hasGoogleOAuth, hasMicrosoftOAuth } from "@/lib/mailbox";
 import { getLeadSource, leadSourceContext } from "@/lib/leadsource";
+import { calcomWebhookUrl } from "@/lib/webhook-token";
 import { Topbar } from "@/components/nav/Topbar";
 import { ConnectionsClient, type MailboxVM } from "@/components/connections/ConnectionsClient";
 import { LeadSourcesSection, type ConnectedSource } from "@/components/connections/LeadSourcesSection";
@@ -44,6 +45,7 @@ export default async function ConnectionsPage() {
           microsoftConfigured={hasMicrosoftOAuth()}
           calendar={calendar ? { provider: calendar.provider, status: calendar.status, bookingLink: calendar.bookingLink } : null}
           slackConfigured={Boolean(org?.slackWebhookEnc)}
+          calcomWebhookUrl={calcomWebhookUrl(ctx.orgId)}
         />
         <LeadSourcesSection connected={connectedSources} />
       </div>

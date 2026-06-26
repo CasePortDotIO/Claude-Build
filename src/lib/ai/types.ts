@@ -35,6 +35,7 @@ export interface DraftInput {
   // learned phrasing is reserved for TREATMENT so lift is measurable.
   cohort?: "TREATMENT" | "HOLDOUT";
   retiredPhrases?: string[]; // openers the agent learned to avoid
+  promotedOpeners?: string[]; // openers the agent learned to favor
 }
 
 export interface DraftVariantOut {

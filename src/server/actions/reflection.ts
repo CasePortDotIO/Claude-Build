@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireOrg } from "@/lib/auth-helpers";
 import { runReflection, applyInsight, vetoInsight } from "@/lib/agent/reflection";
+import { reengagementSweep } from "@/lib/agent/maintenance";
 
 export interface ReflectionActionResult {
   ok: boolean;
@@ -10,16 +11,21 @@ export interface ReflectionActionResult {
   message?: string;
 }
 
-/** Run the reflection pass now (the nightly job is triggered on a schedule in prod). */
+/**
+ * Run the reflection pass + the silence/follow-up sweep now (both run on the
+ * nightly cron in prod). Reflection proposes copy/timing insights; the sweep
+ * cools leads that went quiet past the learned follow-up gap so they re-queue.
+ */
 export async function runReflectionAction(): Promise<ReflectionActionResult> {
   const ctx = await requireOrg();
-  const res = await runReflection(ctx.orgId);
+  const [res, sweep] = await Promise.all([runReflection(ctx.orgId), reengagementSweep(ctx.orgId)]);
   revalidatePath("/agent");
+  revalidatePath("/leads");
   revalidatePath("/");
-  return {
-    ok: true,
-    message: res.created > 0 ? `Reflection found ${res.created} new insight(s).` : res.skipped[0] ?? "No new insights — nothing to change.",
-  };
+  const parts: string[] = [];
+  parts.push(res.created > 0 ? `${res.created} new insight(s)` : res.skipped[0] ?? "no new insights");
+  if (sweep.cooled > 0) parts.push(`${sweep.cooled} silent lead(s) re-queued`);
+  return { ok: true, message: parts.join(" · ") };
 }
 
 export async function applyInsightAction(insightId: string): Promise<ReflectionActionResult> {

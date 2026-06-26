@@ -101,6 +101,7 @@ export async function generateDraftsForLead(opts: {
     variantCount,
     cohort,
     retiredPhrases: learning?.retiredPhrases ?? [],
+    promotedOpeners: learning?.promotedOpeners ?? [],
   };
 
   // Reason: call the provider (Claude or stub).

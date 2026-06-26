@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -65,10 +65,18 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [switching, startSwitch] = useTransition();
 
   function switchTo(orgId: string) {
     if (orgId === activeOrgId) return setSwitcherOpen(false);
-    switchOrgAction(orgId).then(() => { setSwitcherOpen(false); router.push("/"); router.refresh(); });
+    startSwitch(async () => {
+      const r = await switchOrgAction(orgId);
+      setSwitcherOpen(false);
+      if (r.ok) {
+        router.push("/");
+        router.refresh();
+      }
+    });
   }
   const nav = NAV.filter((item) => !item.reseller || isAgencyAdmin);
   const initials = userName
@@ -91,10 +99,11 @@ export function Sidebar({
         {memberships.length > 1 && (
           <div className="mt-3">
             <button
+              disabled={switching}
               onClick={() => setSwitcherOpen((v) => !v)}
-              className="flex w-full items-center justify-between rounded-lg bg-charcoal-soft px-3 py-2 text-[12.5px] font-medium text-on-dark hover:bg-[#2c3137]"
+              className="flex w-full items-center justify-between rounded-lg bg-charcoal-soft px-3 py-2 text-[12.5px] font-medium text-on-dark hover:bg-[#2c3137] disabled:opacity-60"
             >
-              <span className="truncate">{orgName}</span>
+              <span className="truncate">{switching ? "Switching…" : orgName}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4" /></svg>
             </button>
             {switcherOpen && (
@@ -102,8 +111,9 @@ export function Sidebar({
                 {memberships.map((m) => (
                   <button
                     key={m.orgId}
+                    disabled={switching}
                     onClick={() => switchTo(m.orgId)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-[12.5px] hover:bg-charcoal-soft ${m.orgId === activeOrgId ? "text-white" : "text-on-dark-soft"}`}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-[12.5px] hover:bg-charcoal-soft disabled:opacity-60 ${m.orgId === activeOrgId ? "text-white" : "text-on-dark-soft"}`}
                   >
                     <span className="truncate">{m.name}</span>
                     <span className="ml-2 flex-none rounded bg-charcoal px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-on-dark-mute">

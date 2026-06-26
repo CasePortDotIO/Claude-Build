@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCalendarProvider, calendarContext } from "@/lib/calendar";
 import { transition, canTransition } from "@/lib/agent/state-machine";
+import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { notifyBooking } from "@/lib/notify";
 import { slotLabel } from "@/lib/calendar/slots";
 
@@ -52,8 +53,13 @@ export async function bookCall(opts: {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
   if (!lead) throw new BookingError("Lead not found in this workspace.");
   if (lead.status === "BOOKED") throw new BookingError("Lead already has a booked call.");
-  if (["OPTED_OUT", "DO_NOT_CONTACT", "BOUNCED"].includes(lead.status)) {
-    throw new BookingError(`Lead is ${lead.status} — booking is blocked by compliance rails.`);
+  // Single contactability gate (status + suppression table) — same as draft/send,
+  // so a suppressed email can't be booked even via the self-serve webhook.
+  try {
+    await assertContactable(orgId, lead.email, lead.status);
+  } catch (e) {
+    if (e instanceof ComplianceError) throw new BookingError(e.message);
+    throw e;
   }
 
   const cal = await activeCalendar(orgId);

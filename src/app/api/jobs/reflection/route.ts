@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runReflection } from "@/lib/agent/reflection";
+import { reengagementSweep } from "@/lib/agent/maintenance";
 
 /**
  * Nightly reflection job (§8). In production this is invoked on a schedule —
@@ -22,9 +23,13 @@ export async function POST(req: NextRequest) {
 
   const orgs = await prisma.org.findMany({ where: { type: "CLIENT" }, select: { id: true } });
   let totalInsights = 0;
+  let totalCooled = 0;
   for (const org of orgs) {
     const res = await runReflection(org.id);
     totalInsights += res.created;
+    // Follow-up branch: cool leads that went silent past the learned gap.
+    const sweep = await reengagementSweep(org.id);
+    totalCooled += sweep.cooled;
   }
-  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights });
+  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled });
 }

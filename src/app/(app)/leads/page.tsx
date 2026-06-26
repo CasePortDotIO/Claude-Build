@@ -5,6 +5,7 @@ import { Topbar } from "@/components/nav/Topbar";
 import { LeadFilters } from "@/components/leads/LeadFilters";
 import { LeadsView, type LeadRow, type DraftPreview } from "@/components/leads/LeadsView";
 import { leadFilterSchema } from "@/lib/zod/lead";
+import { LEAD_STATUS_ORDER } from "@/lib/types";
 import { timeAgo } from "@/lib/format";
 import type { Prisma, LeadStatus } from "@prisma/client";
 
@@ -21,7 +22,11 @@ export default async function LeadsPage({
   const activeStatus = filter.status ?? "all";
 
   const where: Prisma.LeadWhereInput = {};
-  if (activeStatus !== "all") where.status = activeStatus as LeadStatus;
+  // Only apply a status filter when it's a real LeadStatus — a hand-crafted
+  // ?status=foo is ignored rather than throwing a Prisma validation 500.
+  if (activeStatus !== "all" && LEAD_STATUS_ORDER.includes(activeStatus as LeadStatus)) {
+    where.status = activeStatus as LeadStatus;
+  }
   if (filter.q) {
     where.OR = [
       { email: { contains: filter.q, mode: "insensitive" } },

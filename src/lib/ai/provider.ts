@@ -182,17 +182,23 @@ export class StubProvider implements LLMProvider {
     const filtered = isHoldout ? angles : angles.filter((a) => !isRetired(a.opener));
     const pool = filtered.length >= 2 ? filtered : angles;
 
+    // Favor openers the agent learned out-perform (§8): a small confidence boost
+    // so a promoted opener becomes the selected/sent variant.
+    const promoted = (input.promotedOpeners ?? []).map((p) => p.toLowerCase());
+    const isPromoted = (opener: string) => promoted.some((p) => p && opener.toLowerCase().includes(p));
+
     const chosen = pool.slice(0, Math.max(2, Math.min(3, input.variantCount)));
     const variants: DraftVariantOut[] = chosen.map((a, i) => {
       const body = [`${greeting}`, ``, a.opener, ``, a.ask, ``, signOff, ``, optOutLine].join("\n");
       const subject = subjectFor(a.angle, lead);
+      const boost = isPromoted(a.opener) ? 0.1 : 0;
       return {
         angle: a.angle,
         subject,
         body,
         openingLine: a.opener,
-        confidence: round2(a.base - i * 0.03),
-        rationale: groundedRationale(a.angle, lead),
+        confidence: round2(a.base - i * 0.03 + boost),
+        rationale: isPromoted(a.opener) ? `${groundedRationale(a.angle, lead)} (opener the agent learned out-performs)` : groundedRationale(a.angle, lead),
       };
     });
 
