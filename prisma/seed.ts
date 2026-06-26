@@ -1,23 +1,9 @@
+// MUST be first: loads .env before @/lib/prisma is instantiated.
+import "./load-env";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { readFileSync, existsSync } from "node:fs";
-import path from "node:path";
-
-// tsx doesn't auto-load .env the way `prisma migrate` does; load it here so
-// `npm run db:seed` works standalone. Minimal parser, no extra dependency.
-const envPath = path.resolve(process.cwd(), ".env");
-if (existsSync(envPath)) {
-  for (const line of readFileSync(envPath, "utf8").split("\n")) {
-    const t = line.trim();
-    if (!t || t.startsWith("#")) continue;
-    const eq = t.indexOf("=");
-    if (eq === -1) continue;
-    const key = t.slice(0, eq).trim();
-    let val = t.slice(eq + 1).trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
-    if (!(key in process.env)) process.env[key] = val;
-  }
-}
+import { learnVoice } from "@/lib/agent/voice";
+import { generateDraftsForLead } from "@/lib/agent/draft";
 
 const prisma = new PrismaClient();
 
@@ -89,28 +75,31 @@ async function main() {
   });
 
   // Sample leads per client org.
+  // Goals/inquiries are phrased as second-person noun phrases so they read
+  // naturally both in the "what the agent understands" drawer and when the
+  // copy engine interpolates them into a sentence.
   const monroeLeads = [
-    { email: "dana.k@gmail.com", firstName: "Dana", lastName: "Klein", company: "Freelance", originalInquiry: "Wanted help pricing her 1:1 coaching packages", statedGoal: "Replace her salary with coaching income", toneRead: "warm, hesitant", region: "US-TX" },
-    { email: "phil@growthlab.io", firstName: "Phil", lastName: "Owens", company: "GrowthLab", originalInquiry: "Asked about the 8-week accountability program", statedGoal: "Stay consistent on a launch", toneRead: "direct", region: "US-CA" },
-    { email: "sara.bennett@outlook.com", firstName: "Sara", lastName: "Bennett", company: "Bennett Studio", originalInquiry: "Inquired about group coaching cohort", statedGoal: "Build a peer support circle", toneRead: "enthusiastic", region: "US-NY" },
-    { email: "tom.h@protonmail.com", firstName: "Tom", lastName: "Harris", originalInquiry: "Downloaded the goal-setting guide, never replied", statedGoal: "Get unstuck after a career change", toneRead: "guarded", region: "UK" },
+    { email: "dana.k@gmail.com", firstName: "Dana", lastName: "Klein", company: "Freelance", originalInquiry: "pricing your 1:1 coaching packages", statedGoal: "replacing your salary with coaching income", toneRead: "warm, hesitant", objections: ["worried about the time commitment"], region: "US-TX" },
+    { email: "phil@growthlab.io", firstName: "Phil", lastName: "Owens", company: "GrowthLab", originalInquiry: "the 8-week accountability program", statedGoal: "staying consistent through your launch", toneRead: "direct", objections: ["not sure it's worth the price"], region: "US-CA" },
+    { email: "sara.bennett@outlook.com", firstName: "Sara", lastName: "Bennett", company: "Bennett Studio", originalInquiry: "the group coaching cohort", statedGoal: "building a peer support circle", toneRead: "enthusiastic", objections: [], region: "US-NY" },
+    { email: "tom.h@protonmail.com", firstName: "Tom", lastName: "Harris", originalInquiry: "the goal-setting guide you downloaded", statedGoal: "getting unstuck after a career change", toneRead: "guarded", objections: ["went quiet, never replied"], region: "UK" },
   ];
   const apexLeads = [
-    { email: "rachel@fitmail.com", firstName: "Rachel", lastName: "Vance", originalInquiry: "Asked about the 90-day transformation", statedGoal: "Lose 20lb before her wedding", toneRead: "motivated", region: "US-CO" },
-    { email: "deepa@startup.dev", firstName: "Deepa", lastName: "Rao", company: "Startup.dev", originalInquiry: "Inquired about corporate wellness", statedGoal: "Lower team burnout", toneRead: "analytical", region: "US-WA" },
+    { email: "rachel@fitmail.com", firstName: "Rachel", lastName: "Vance", originalInquiry: "the 90-day transformation", statedGoal: "getting in shape before your wedding", toneRead: "motivated", objections: [], region: "US-CO" },
+    { email: "deepa@startup.dev", firstName: "Deepa", lastName: "Rao", company: "Startup.dev", originalInquiry: "corporate wellness for your team", statedGoal: "lowering team burnout", toneRead: "analytical", objections: ["needs buy-in from leadership"], region: "US-WA" },
   ];
 
   for (const l of monroeLeads) {
     await prisma.lead.upsert({
       where: { orgId_email: { orgId: monroe.id, email: l.email } },
-      update: {},
+      update: { originalInquiry: l.originalInquiry, statedGoal: l.statedGoal, toneRead: l.toneRead, objections: l.objections },
       create: { ...l, orgId: monroe.id, source: "seed", consentBasis: "PRIOR_INQUIRY", priorContact: true, status: "NEW" },
     });
   }
   for (const l of apexLeads) {
     await prisma.lead.upsert({
       where: { orgId_email: { orgId: apex.id, email: l.email } },
-      update: {},
+      update: { originalInquiry: l.originalInquiry, statedGoal: l.statedGoal, toneRead: l.toneRead, objections: l.objections },
       create: { ...l, orgId: apex.id, source: "seed", consentBasis: "PRIOR_INQUIRY", priorContact: true, status: "NEW" },
     });
   }
@@ -121,6 +110,36 @@ async function main() {
     update: {},
     create: { orgId: monroe.id, email: "optedout@example.com", reason: "OPTED_OUT" },
   });
+
+  // ── M2: learn Monroe's voice + pre-generate drafts so the app has content ──
+  // Uses the real engine (deterministic stub + local embeddings when no API
+  // keys are set), so memory embeddings + agent_runs are populated authentically.
+  const existingProfile = await prisma.voiceProfile.findUnique({ where: { orgId: monroe.id } });
+  if (!existingProfile) {
+    await learnVoice({
+      orgId: monroe.id,
+      operatorName: "Monroe Coaching",
+      samples: [
+        { subject: "loved our chat", body: "Hi Dana,\n\nReally enjoyed talking through your packages. Quick thought — want me to map out a simple pricing tier you could launch this month?\n\nNo rush either way.\n\n— Jess" },
+        { subject: "the launch", body: "Hey Phil,\n\nYou mentioned staying consistent through your launch. I put together a short accountability rhythm that works for founders. Want me to send it?\n\n— Jess" },
+        { body: "Hi Sara,\n\nThe cohort idea you raised stuck with me. I think a small peer circle would suit you. Open to a quick call to sketch it out?\n\n— Jess" },
+      ],
+    });
+  }
+
+  // Draft for two Monroe leads so the Approvals queue isn't empty (idempotent:
+  // only if there are no pending drafts yet).
+  const pendingCount = await prisma.draft.count({ where: { orgId: monroe.id, status: "PENDING_APPROVAL" } });
+  if (pendingCount === 0) {
+    const monroeNewLeads = await prisma.lead.findMany({
+      where: { orgId: monroe.id, status: { in: ["NEW", "RESEARCHED"] } },
+      take: 2,
+      orderBy: { createdAt: "asc" },
+    });
+    for (const lead of monroeNewLeads) {
+      await generateDraftsForLead({ orgId: monroe.id, leadId: lead.id, operatorName: "Monroe Coaching" });
+    }
+  }
 
   console.log("Seed complete:");
   console.log("  Agency:  Delegate and Done");

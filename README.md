@@ -11,29 +11,42 @@ time.
 
 ---
 
-## Status — Milestone 1 shipped ✅
+## Status — Milestones 1 & 2 shipped ✅
 
 **M1: Schema + auth + multi-tenant org model + CSV import + lead table UI.**
+**M2: Voice profile + memory/pgvector + Claude draft engine + Approval queue.**
 
 What works right now, end-to-end:
 
 - **Multi-tenant from day one.** An Agency (reseller) owns Client orgs; every
   tenant-owned row is `orgId`-scoped and only ever read through a single choke
-  point (`src/lib/tenancy.ts`). Proven by a live cross-tenant isolation test.
+  point (`src/lib/tenancy.ts`). Proven by live cross-tenant isolation tests
+  (leads *and* semantic memory).
 - **Auth** (Auth.js / NextAuth v5, credentials) with an org + role on the
   session. Sign-up atomically creates User → Org → Membership(CLIENT_ADMIN).
 - **CSV import** with a real upload → **column-mapper** → preview → confirm flow,
   including the **prior-contact gate** (§9): reactivation only, never cold spam.
-  Import filters out suppressed + duplicate emails server-side.
-- **Leads table** (filterable + search) with the *"what the agent understands /
-  next message it will send"* drawer (memory fields populate in M2).
-- **Command Center** with live lead counts (full KPIs land in M4).
+- **Two-layer memory.** Structured per-lead facts in Postgres + **semantic memory
+  in pgvector** (`vector(1024)`, HNSW cosine index). Retrieval is org-isolated and
+  injects the top-k voice samples + similar objections into every draft.
+- **Voice profile** learned from past emails (tone, length, emoji, greeting,
+  sign-off, signature move) — viewable and editable on **The Agent** page.
+- **Claude draft engine** via forced **tool/JSON** calls: 2–3 grounded variants
+  with confidence + rationale, "ask-don't-pitch" rules, a one-line opt-out in
+  every email, and **personalization from real memory only — never invented**.
+  Every call is logged to `agent_runs` (provider, model, tokens, cost, latency).
+- **Approval queue** (v1 default = preview & approve): switch variants, edit,
+  approve / reject / **approve-all**. Approval moves the lead to `SCHEDULED` —
+  **nothing sends yet** (that's M3).
+- **Runs with or without API keys.** No `ANTHROPIC_API_KEY` → a deterministic
+  StubProvider writes real, memory-grounded copy; no `VOYAGE_API_KEY` → a
+  deterministic local embedder. Add the keys to switch to Claude + Voyage with
+  zero code changes.
 
-### What's stubbed in M1 (and where it lands)
+### What's stubbed / still to come
 
 | Area | Milestone |
 | --- | --- |
-| Voice profile, memory tables + pgvector, Claude draft engine, Approval queue | M2 |
 | Gmail OAuth send + reply detection + agent state machine + Conversations UI | M3 |
 | Cal.com booking + booking detection + Command Center KPIs/activity feed | M4 |
 | Compliance rails (opt-out, suppression enforcement, caps, warmup) + Deliverability view | M5 |
@@ -42,6 +55,7 @@ What works right now, end-to-end:
 | Reseller / white-label roll-up screens | M8 |
 
 The nav shows later screens marked **SOON** so the structure is locked now.
+**Real sending is intentionally absent** until M3 — approval is the terminal step today.
 
 ---
 
@@ -89,13 +103,24 @@ npm run dev             # http://localhost:3000
 
 Sign in as each to *see* tenant isolation: neither org can see the other's leads.
 
-### 5. Try the acceptance path for M1
+### 5. Try the acceptance path (M1 + M2)
 
-1. Sign in as Jessica → **Command Center** shows 4 leads.
-2. **Leads** → click a row → the drawer shows what the agent understands.
+1. Sign in as Jessica → **Command Center** shows the sweep.
+2. **Leads** → click a row → the drawer shows *what the agent understands* and the
+   real *next message it will send* (Dana & Phil come pre-drafted from the seed).
 3. **New sweep** → upload a CSV (headers + an email column) → map columns →
-   confirm the prior-contact attestation → import. New leads appear in the table;
-   suppressed/duplicate rows are reported and skipped.
+   confirm the prior-contact attestation → import. Suppressed/duplicate rows are
+   reported and skipped.
+4. **The Agent** → see the learned **voice profile**, memory stats, and the agent
+   run log (tokens + cost per step). Click **Learn from emails** to paste your own.
+5. **Leads** → *Generate drafts for N eligible* (or per-lead in the drawer). The
+   agent grounds each draft in that lead's memory and queues it.
+6. **Approvals** → review variants, edit, **approve / reject / approve-all**.
+   Approving moves the lead to `SCHEDULED`. (Sending is M3 — nothing leaves a
+   mailbox yet.) Opted-out / suppressed leads are refused a draft entirely.
+
+> Sign in as `marco@apexfit.co` to confirm isolation: Apex sees none of Monroe's
+> leads, drafts, voice, or memory.
 
 ---
 

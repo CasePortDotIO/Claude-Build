@@ -59,6 +59,13 @@ model Org {
   suppressions SuppressionEntry[]
   auditLogs    AuditLog[]
 
+  // M2: voice + memory + drafting
+  voiceProfile     VoiceProfile?
+  voiceSamples     VoiceSample[]
+  memoryEmbeddings MemoryEmbedding[]
+  drafts           Draft[]
+  agentRuns        AgentRun[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -160,6 +167,14 @@ model Lead {
   importId   String?
   import     LeadImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
 
+  // M2: objections the agent has read off this lead's history (structured memory)
+  objections String[] @default([])
+
+  // M2 relations
+  drafts           Draft[]
+  memoryEmbeddings MemoryEmbedding[]
+  agentRuns        AgentRun[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -233,4 +248,176 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([orgId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M2 — Voice profile, semantic memory (pgvector), drafting, agent audit
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The operator's "Warm Sweep voice", learned from past emails and editable.
+// One per org. Structured memory layer (a) at the org level.
+model VoiceProfile {
+  id    String @id @default(cuid())
+  orgId String @unique
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  tone          String  @default("Warm, direct, no fluff")
+  sentenceLength String @default("Short. Punchy.")
+  emojiUse      String  @default("Rare, never salesy")
+  greeting      String  @default("Hi {{firstName}},")
+  signOff       String  @default("— {{operator}}")
+  signatureMove String  @default("Ask, don't pitch")
+  summary       String? @db.Text // a paragraph the agent uses as a style anchor
+
+  // Draft rules (editable per org). Defaults encode the §5 "ask-don't-pitch" rules.
+  doRules   String[] @default([])
+  dontRules String[] @default([])
+
+  sampleCount Int    @default(0)
+  source      String @default("default") // "default" | "learned" | "edited"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A raw past email from the operator, used to learn voice + retrieved as a
+// style exemplar when drafting. Its embedding lives in MemoryEmbedding.
+model VoiceSample {
+  id      String  @id @default(cuid())
+  orgId   String
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subject String?
+  body    String  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+}
+
+// Semantic memory layer (b). One row per embedded chunk; the `embedding`
+// column is a pgvector column managed via raw SQL (see lib/memory).
+enum MemoryKind {
+  VOICE_SAMPLE // operator's voice
+  LEAD_REPLY // something a lead wrote back
+  OBJECTION // an objection snippet
+  INQUIRY // the lead's original inquiry
+}
+
+model MemoryEmbedding {
+  id      String     @id @default(cuid())
+  orgId   String
+  org     Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind    MemoryKind
+  leadId  String?
+  lead    Lead?      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sourceId String? // e.g. VoiceSample.id this chunk came from
+  content String     @db.Text
+  metadata Json?
+
+  // pgvector column. Declared Unsupported so Prisma creates/drops it but we
+  // read/write it through $queryRaw/$executeRaw (vector(1024) = voyage-3 dim).
+  embedding Unsupported("vector(1024)")?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, kind])
+  @@index([leadId])
+}
+
+// A generated message awaiting human approval (v1 default). Groups its variants.
+enum DraftStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUPERSEDED // a newer generation replaced it
+}
+
+model Draft {
+  id     String @id @default(cuid())
+  orgId  String
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  status DraftStatus @default(PENDING_APPROVAL)
+
+  variants        DraftVariant[]
+  selectedVariantId String?
+
+  // Final, possibly human-edited copy at approval time.
+  finalSubject String?
+  finalBody    String? @db.Text
+  editedByHuman Boolean @default(false)
+
+  approvedById String?
+  approvedAt   DateTime?
+  rejectedReason String?
+
+  agentRunId String?
+  agentRun   AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, status])
+  @@index([leadId])
+}
+
+model DraftVariant {
+  id      String @id @default(cuid())
+  draftId String
+  draft   Draft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  index       Int
+  angle       String // e.g. "goal-led", "curiosity", "direct"
+  subject     String
+  body        String @db.Text
+  openingLine String // first line — tracked for self-improvement analytics (M6)
+  confidence  Float  @default(0)
+  rationale   String @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([draftId])
+}
+
+// Audit row for every agent step (§3). Makes the loop fully inspectable:
+// input summary, structured decision, tokens, cost, latency.
+enum AgentStep {
+  RESEARCH
+  DRAFT
+  REPLY
+  REFLECT
+  VOICE_LEARN
+}
+
+model AgentRun {
+  id     String @id @default(cuid())
+  orgId  String
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId String?
+  lead   Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  step     AgentStep
+  provider String // "anthropic" | "stub"
+  model    String
+
+  inputSummary String  @db.Text
+  decision     Json? // the structured tool output
+  rationale    String? @db.Text
+  confidence   Float?
+
+  promptTokens     Int   @default(0)
+  completionTokens Int   @default(0)
+  costUsd          Float @default(0)
+  latencyMs        Int   @default(0)
+
+  status String  @default("OK") // "OK" | "ERROR"
+  error  String? @db.Text
+
+  drafts Draft[]
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([leadId])
 }

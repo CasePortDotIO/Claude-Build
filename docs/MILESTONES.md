@@ -3,7 +3,7 @@
 The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 
 - [x] **M1 — Foundation.** Schema + auth + multi-tenant org model + CSV import + lead table UI.
-- [ ] **M2 — Memory & drafting.** Voice profile + memory tables/pgvector + Claude draft engine + Approval queue (render email, no real send).
+- [x] **M2 — Memory & drafting.** Voice profile + memory tables/pgvector + Claude draft engine + Approval queue (render email, no real send).
 - [ ] **M3 — Send loop.** Gmail OAuth send + reply detection + agent state machine + Conversations UI.
 - [ ] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
 - [ ] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view.
@@ -33,3 +33,19 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - `src/app/(app)/**` — shell, Command Center, Leads, import wizard.
 - `src/app/(auth)/**` — sign-in/up.
 - Tests: mapping, prior-contact-gate, tenancy (isolation), import.
+
+## M2 file map (built)
+- `prisma/schema.prisma` — VoiceProfile, VoiceSample, MemoryEmbedding (pgvector `vector(1024)` + HNSW cosine index), Draft, DraftVariant, AgentRun.
+- `src/lib/ai/config.ts` — provider config + cost table; runs with or without API keys.
+- `src/lib/ai/embedder.ts` — `Embedder` (VoyageEmbedder real, HashEmbedder deterministic local).
+- `src/lib/memory.ts` — store/retrieve over pgvector; raw SQL, **orgId required on every call**.
+- `src/lib/ai/{types,prompts,anthropic,provider}.ts` — `LLMProvider` (Anthropic forced tool-use + StubProvider), draft + voice engines.
+- `src/lib/agent/{voice,draft}.ts` — orchestrators: learn voice; generate drafts (memory-grounded, guards opt-out/suppression, logs AgentRun, advances lead state).
+- `src/server/actions/agent.ts` — learn/edit voice, generate drafts, approve/reject/approve-all.
+- `src/app/(app)/{agent,approvals}/**`, `components/{agent,approvals}/**`, Leads drawer drafts.
+- Tests: embedder determinism + cosine ranking; memory retrieval + per-org isolation; stub draft shape + grounding (no invented facts); draft guard rails (opt-out/suppression) + state transitions.
+
+### M2 notes / what's stubbed
+- **No API keys required to run.** Without `ANTHROPIC_API_KEY` the StubProvider writes real, memory-grounded copy; without `VOYAGE_API_KEY` the HashEmbedder gives deterministic, overlap-sensitive embeddings. Set the keys to switch to Claude + Voyage with zero code changes.
+- **Nothing sends.** Approval sets the lead to `SCHEDULED`; the actual Gmail send + reply detection is M3.
+- pgvector must be enabled (the M2 migration runs `CREATE EXTENSION IF NOT EXISTS vector`).

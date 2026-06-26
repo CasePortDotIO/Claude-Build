@@ -64,6 +64,41 @@ export function orgScoped(orgId: string) {
       create: (args: { data: Omit<Prisma.AuditLogUncheckedCreateInput, "orgId"> }) =>
         prisma.auditLog.create({ data: { ...args.data, orgId } }),
     },
+
+    // M2 reads (writes happen in the agent orchestrators, always orgId-filtered).
+    draft: {
+      findMany: (args?: Omit<Prisma.DraftFindManyArgs, "where"> & { where?: Prisma.DraftWhereInput }) =>
+        prisma.draft.findMany({ ...args, where: { ...args?.where, orgId } }),
+
+      findFirst: (args?: Omit<Prisma.DraftFindFirstArgs, "where"> & { where?: Prisma.DraftWhereInput }) =>
+        prisma.draft.findFirst({ ...args, where: { ...args?.where, orgId } }),
+
+      count: (args?: { where?: Prisma.DraftWhereInput }) =>
+        prisma.draft.count({ where: { ...args?.where, orgId } }),
+    },
+
+    voiceProfile: {
+      find: () => prisma.voiceProfile.findUnique({ where: { orgId } }),
+    },
+
+    voiceSample: {
+      count: () => prisma.voiceSample.count({ where: { orgId } }),
+      findMany: (args?: Omit<Prisma.VoiceSampleFindManyArgs, "where"> & { where?: Prisma.VoiceSampleWhereInput }) =>
+        prisma.voiceSample.findMany({ ...args, where: { ...args?.where, orgId } }),
+    },
+
+    agentRun: {
+      findMany: (args?: Omit<Prisma.AgentRunFindManyArgs, "where"> & { where?: Prisma.AgentRunWhereInput }) =>
+        prisma.agentRun.findMany({ ...args, where: { ...args?.where, orgId } }),
+
+      count: (args?: { where?: Prisma.AgentRunWhereInput }) =>
+        prisma.agentRun.count({ where: { ...args?.where, orgId } }),
+    },
+
+    memory: {
+      count: (args?: { where?: Prisma.MemoryEmbeddingWhereInput }) =>
+        prisma.memoryEmbedding.count({ where: { ...args?.where, orgId } }),
+    },
   };
 }
 
