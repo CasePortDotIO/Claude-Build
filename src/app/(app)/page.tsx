@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireOrg } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
 import { Topbar } from "@/components/nav/Topbar";
 import { commandCenterKpis, reactivationsChart, activityFeed } from "@/lib/metrics";
 import { formatMoney, timeAgo } from "@/lib/format";
@@ -9,10 +10,11 @@ import { formatMoney, timeAgo } from "@/lib/format";
 // card (with metric-justified changes) is M6; here we surface the latest real run.
 export default async function CommandCenter() {
   const ctx = await requireOrg();
-  const [kpis, chart, activity] = await Promise.all([
+  const [kpis, chart, activity, latestInsight] = await Promise.all([
     commandCenterKpis(ctx.orgId),
     reactivationsChart(ctx.orgId),
     activityFeed(ctx.orgId),
+    prisma.insight.findFirst({ where: { orgId: ctx.orgId, status: "APPLIED" }, orderBy: { appliedAt: "desc" } }),
   ]);
 
   const maxBar = Math.max(1, ...chart.map((b) => b.value));
@@ -39,8 +41,8 @@ export default async function CommandCenter() {
           <KpiCard label="Active conversations" value={kpis.activeConversations} sub="the agent is handling" accent />
         </div>
 
-        {/* latest agent action */}
-        {activity.find((a) => a.kind === "agent") && (
+        {/* the agent updated itself — wired to the latest applied insight */}
+        {(latestInsight || activity.find((a) => a.kind === "agent")) && (
           <div className="mb-[22px] overflow-hidden rounded-xl2 bg-charcoal p-[26px] px-7">
             <div className="mb-4 flex items-center gap-2.5">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5CA98A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -48,20 +50,29 @@ export default async function CommandCenter() {
                 <circle cx="12" cy="12" r="3.2" />
               </svg>
               <p className="m-0 font-sans text-[12px] font-semibold uppercase tracking-[1.8px] text-sweep-light">
-                The agent is working · {timeAgo(activity.find((a) => a.kind === "agent")!.at)}
+                {latestInsight
+                  ? `The agent updated itself · ${timeAgo(latestInsight.appliedAt ?? latestInsight.createdAt)}`
+                  : `The agent is working · ${timeAgo(activity.find((a) => a.kind === "agent")!.at)}`}
               </p>
             </div>
             <p className="m-0 mb-[18px] max-w-[760px] font-heading text-[20px] font-medium leading-[1.4] text-white">
-              Every email is grounded in real memory and waits for your approval. It revives cold leads, handles the
-              replies, and books the call — and it&apos;s learning your <span className="text-sweep-light">best send-times</span>{" "}
-              and <span className="text-sweep-light">openers</span> as outcomes come in.
+              {latestInsight ? (
+                latestInsight.body
+              ) : (
+                <>
+                  Every email is grounded in real memory and waits for your approval. It revives cold leads, handles the
+                  replies, and books the call — and it&apos;s learning your{" "}
+                  <span className="text-sweep-light">best send-times</span> and{" "}
+                  <span className="text-sweep-light">openers</span> as outcomes come in.
+                </>
+              )}
             </p>
             <div className="flex flex-wrap gap-2.5">
+              {latestInsight && <Chip>{latestInsight.metric}</Chip>}
               <Chip>{kpis.callsBooked} booked</Chip>
               <Chip>reply rate {Math.round(kpis.replyRate * 100)}%</Chip>
-              <Chip>self-improvement log → M6</Chip>
               <Link href="/agent" className="ml-auto rounded-md bg-sweep-light px-3 py-1.5 text-[12.5px] font-semibold text-charcoal hover:bg-[#6dbd9b]">
-                See the agent →
+                See what it learned →
               </Link>
             </div>
           </div>

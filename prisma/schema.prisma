@@ -77,6 +77,10 @@ model Org {
   // Slack webhook for "call booked" notifications (§6); encrypted at rest.
   slackWebhookEnc String?
 
+  // M6: self-improvement
+  insights Insight[]
+  learning OrgLearning?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -193,6 +197,10 @@ model Lead {
   // M4: estimated deal value (drives the "recovered revenue" KPI) + bookings
   dealValueCents Int       @default(0)
   bookings       Booking[]
+
+  // M6: A/B holdout cohort. HOLDOUT gets baseline copy/timing so improvement
+  // is measured against a control, not asserted.
+  cohort Cohort @default(TREATMENT)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -674,4 +682,74 @@ model Booking {
 
   @@index([orgId, createdAt])
   @@index([leadId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M6 — Self-improvement (bounded + auditable)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// A/B holdout cohorts. TREATMENT = agent-optimized copy/timing; HOLDOUT =
+// baseline control. Reflection compares the two to measure real lift.
+enum Cohort {
+  TREATMENT
+  HOLDOUT
+}
+
+// What the agent taught itself. Each insight is a metric-justified proposal the
+// operator can apply or veto (§8). Adjustments only ever touch copy/timing.
+enum InsightKind {
+  PROMOTE_OPENER // an opening line that out-performs
+  RETIRE_PHRASE // an opening line that under-performs
+  SHIFT_SENDTIME // a better send hour
+  TIGHTEN_FOLLOWUP // adjust the follow-up gap
+  AB_RESULT // holdout vs treatment readout (informational)
+}
+
+enum InsightStatus {
+  PROPOSED
+  APPLIED
+  VETOED
+}
+
+model Insight {
+  id     String        @id @default(cuid())
+  orgId  String
+  org    Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  kind   InsightKind
+  status InsightStatus @default(PROPOSED)
+
+  title  String
+  body   String  @db.Text
+  metric String // the number that justifies it, e.g. "2.3× more replies"
+
+  // The concrete, machine-applicable change (e.g. { bestSendHour: 9 } or
+  // { retirePhrase: "just checking in" }). Applied into OrgLearning on accept.
+  payload Json?
+
+  appliedById String?
+  appliedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, status])
+  @@index([orgId, createdAt])
+}
+
+// The agent's applied, tuned settings — the only knobs self-improvement turns.
+// Never touches sending identity or compliance logic (§8/§13).
+model OrgLearning {
+  id    String @id @default(cuid())
+  orgId String @unique
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  bestSendHour    Int? // 0–23, learned highest-reply send hour
+  retiredPhrases  String[] @default([]) // opening lines to avoid
+  promotedOpeners String[] @default([]) // opening lines to favor
+  followUpGapDays Int      @default(3)
+
+  lastReflectionAt DateTime?
+  version          Int       @default(1) // bumps each applied change ("v14")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

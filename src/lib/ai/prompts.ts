@@ -31,6 +31,12 @@ export function buildDraftSystemPrompt(input: DraftInput): string {
     `Persuasive never means deceptive. Ground every personalization in the`,
     `provided memory only. If a fact isn't given, don't assert it.`,
     `Always include the provided one-line opt-out verbatim at the end of the body.`,
+    input.cohort === "HOLDOUT"
+      ? `\nThis is an A/B CONTROL message: use a neutral "just checking in" style — do NOT lead with their specific goal. (We're measuring lift against the optimized version.)`
+      : "",
+    input.retiredPhrases && input.retiredPhrases.length
+      ? `\nAvoid these opening lines — they under-performed: ${input.retiredPhrases.map((p) => `"${p}"`).join(", ")}.`
+      : "",
     ``,
     `Return ${input.variantCount} distinct variants via the submit_drafts tool,`,
     `each taking a different angle, each with a calibrated confidence (0–1).`,

@@ -7,7 +7,7 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 - [x] **M3 — Send loop.** Gmail OAuth send + reply detection + agent state machine + Conversations UI.
 - [x] **M4 — Booking & KPIs.** Cal.com booking + booking detection + Command Center KPIs/activity feed.
 - [x] **M5 — Compliance & deliverability.** Opt-out, suppression enforcement, caps, warmup + Deliverability view. **← v1 (M1–M5) acceptance complete.**
-- [ ] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
+- [x] **M6 — Self-improvement.** Nightly reflection job + "what it taught itself" log + A/B holdout.
 - [ ] **M7 — More integrations.** Microsoft Graph + Calendly + HubSpot/Sheets/Mailchimp/Kajabi importers.
 - [ ] **M8 — Reseller/white-label.** Agency roll-up + per-client branding + per-seat billing fields.
 
@@ -100,3 +100,19 @@ The Warm Sweep ships in runnable slices. v1 (acceptance) = M1–M5.
 ### M5 notes — v1 acceptance (M1–M5) is done
 - Acceptance path works end-to-end: create org → import prior leads → agent drafts grounded copy → approve/edit → send from a mailbox → reply comes back and the thread auto-advances → call booked to the calendar → all on the Command Center — with opt-outs, suppression, CAN-SPAM, and caps enforced throughout.
 - **Honest stubs:** DKIM can't be verified without the provider selector (shown as guidance); SPF/DMARC use a real DNS check when a sending domain is set, else guidance. Domain warmup uses a fixed ramp schedule. Inbox-placement is an estimate derived from the health score (no third-party seed-list test).
+
+## M6 file map (built)
+- `prisma/schema.prisma` — Insight (self-improvement log/proposals), OrgLearning (tuned settings), Lead.cohort (A/B).
+- `src/lib/agent/rollups.ts` — outcome rollups (reply/booking rate by opener + by send-hour + by cohort), A/B lift, deterministic cohort assignment.
+- `src/lib/agent/reflection.ts` — `runReflection` (bounded, metric-justified proposals — copy/timing only), `applyInsight`/`vetoInsight` (apply tunes OrgLearning + bumps version).
+- draft engine now: assigns a stable A/B cohort (HOLDOUT gets a baseline opener), avoids retired phrases, and (real provider) is told the cohort + retired phrases.
+- `src/server/actions/reflection.ts` — run reflection, apply, veto.
+- `src/app/api/jobs/reflection/route.ts` — secret-protected cron endpoint (Vercel/Inngest nightly).
+- `src/components/agent/SelfImprovement.tsx` + The Agent page — A/B holdout card, proposed changes (apply/veto), "what it taught itself" log, learned settings; Command Center "agent updated itself" wired to the latest applied insight.
+- Tests: rollup math + A/B lift + cohort determinism; DB-backed reflection (proposes only allowed copy/timing kinds with metrics, no-dupe, apply→OrgLearning+version, retire→list, veto→VETOED).
+
+### M6 notes / what's bounded
+- **Improvement is measured, not asserted:** ~15% of leads are a deterministic HOLDOUT control with baseline copy; the A/B card shows treatment vs control reply rate + lift with sample sizes.
+- **Guardrails:** reflection only ever proposes opener/send-time/follow-up changes (a closed enum) — never the sending identity or compliance logic (§8/§13). Nothing auto-applies; every change is operator apply/veto and logged with the justifying metric.
+- **No opens:** there's no tracking pixel, so rollups measure replies + bookings (the outcomes that matter), not opens.
+- The nightly job runs via the cron route in prod (Vercel Cron / Inngest); in the app there's a manual "Run reflection" trigger.

@@ -1,8 +1,11 @@
 import { requireOrg } from "@/lib/auth-helpers";
 import { orgScoped } from "@/lib/tenancy";
+import { prisma } from "@/lib/prisma";
 import { Topbar } from "@/components/nav/Topbar";
 import { VoiceProfileCard, type VoiceVM } from "@/components/agent/VoiceProfileCard";
+import { SelfImprovement, type InsightVM, type AbVM } from "@/components/agent/SelfImprovement";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
+import { cohortStats, abLift } from "@/lib/agent/rollups";
 import { timeAgo } from "@/lib/format";
 
 const STEP_LABEL: Record<string, string> = {
@@ -17,13 +20,38 @@ export default async function AgentPage() {
   const ctx = await requireOrg();
   const db = orgScoped(ctx.orgId);
 
-  const [profile, sampleCount, memCount, draftCount, runs] = await Promise.all([
+  const [profile, sampleCount, memCount, draftCount, runs, insights, learning, cohorts] = await Promise.all([
     db.voiceProfile.find(),
     db.voiceSample.count(),
     db.memory.count(),
     db.draft.count(),
     db.agentRun.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
+    prisma.insight.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "desc" }, take: 20 }),
+    prisma.orgLearning.findUnique({ where: { orgId: ctx.orgId } }),
+    cohortStats(ctx.orgId),
   ]);
+
+  const insightVMs: InsightVM[] = insights.map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    status: i.status,
+    title: i.title,
+    body: i.body,
+    metric: i.metric,
+    when: timeAgo(i.appliedAt ?? i.createdAt),
+    informational: i.kind === "AB_RESULT",
+  }));
+
+  const lift = abLift(cohorts);
+  const ab: AbVM | null = lift.treatment
+    ? {
+        liftPct: lift.liftPct,
+        treatmentRate: lift.treatment.replyRate,
+        holdoutRate: lift.holdout?.replyRate ?? 0,
+        treatmentN: lift.treatment.contacted,
+        holdoutN: lift.holdout?.contacted ?? 0,
+      }
+    : null;
 
   const def = defaultVoiceProfile();
   const voice: VoiceVM = {
@@ -60,8 +88,8 @@ export default async function AgentPage() {
             </p>
           </div>
           <div className="flex-none text-center">
-            <p className="m-0 font-heading text-[30px] font-semibold text-sweep-light tabular-nums">{runs.length ? "v2" : "v1"}</p>
-            <p className="m-0 text-[11.5px] text-on-dark-mute">agent runs logged</p>
+            <p className="m-0 font-heading text-[30px] font-semibold text-sweep-light tabular-nums">v{learning?.version ?? 1}</p>
+            <p className="m-0 text-[11.5px] text-on-dark-mute">self-updates</p>
           </div>
         </div>
 
@@ -78,7 +106,21 @@ export default async function AgentPage() {
           <VoiceProfileCard voice={voice} />
         </div>
 
-        {/* what it did (agent runs / self-improvement log seed) */}
+        {/* self-improvement: A/B holdout + proposed changes + what it taught itself */}
+        <div className="mb-[18px]">
+          <SelfImprovement
+            insights={insightVMs}
+            ab={ab}
+            learning={{
+              bestSendHour: learning?.bestSendHour ?? null,
+              retiredPhrases: learning?.retiredPhrases ?? [],
+              version: learning?.version ?? 1,
+              lastReflection: learning?.lastReflectionAt ? timeAgo(learning.lastReflectionAt) : null,
+            }}
+          />
+        </div>
+
+        {/* what it did (agent runs / raw audit log) */}
         <div className="rounded-xl2 border border-line bg-white p-7">
           <p className="m-0 mb-5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">
             What it did · agent run log

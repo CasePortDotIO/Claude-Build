@@ -8,6 +8,7 @@ import { sendApprovedDraft } from "@/lib/agent/send";
 import { ingestInboundEmail } from "@/lib/agent/inbound";
 import { simulatedLeadReply } from "@/lib/mailbox/simulation";
 import { bookCall } from "@/lib/agent/booking";
+import { runReflection, applyInsight } from "@/lib/agent/reflection";
 
 const prisma = new PrismaClient();
 
@@ -210,6 +211,56 @@ async function main() {
       start.setHours(9, 0, 0, 0);
       await bookCall({ orgId: monroe.id, leadId: phil.id, startsAt: start, source: "agent" });
     }
+  }
+
+  // ── M6: seed a history of outcomes for Monroe so self-improvement has signal,
+  // then run reflection and apply one insight (so the Command Center "agent
+  // updated itself" card + the A/B holdout card show real data on first load).
+  const noInsights = (await prisma.insight.count({ where: { orgId: monroe.id } })) === 0;
+  if (noInsights) {
+    const GOOD = "Back when we first spoke, you were focused on your goal";
+    const BASELINE = "Just checking in — wanted to see if you're still interested.";
+    const historyMailbox = mailbox; // the simulated mailbox connected above
+
+    async function seedOutcome(i: number, opener: string, hour: number, replied: boolean, booked: boolean, cohort: "TREATMENT" | "HOLDOUT") {
+      const lead = await prisma.lead.create({
+        data: {
+          orgId: monroe.id,
+          email: `past-${i}@example.com`,
+          firstName: `Past${i}`,
+          source: "seed-history",
+          status: booked ? "BOOKED" : replied ? "REPLIED" : "AWAITING_REPLY",
+          cohort,
+          dealValueCents: booked ? 150000 : 0,
+        },
+      });
+      const draft = await prisma.draft.create({
+        data: {
+          orgId: monroe.id, leadId: lead.id, status: "APPROVED",
+          variants: { create: [{ index: 0, angle: "x", subject: "s", body: "b", openingLine: opener, confidence: 0.8, rationale: "r" }] },
+        },
+        include: { variants: true },
+      });
+      await prisma.draft.update({ where: { id: draft.id }, data: { selectedVariantId: draft.variants[0].id } });
+      const sentAt = new Date(); sentAt.setDate(sentAt.getDate() - 3); sentAt.setHours(hour, 0, 0, 0);
+      await prisma.message.create({
+        data: { orgId: monroe.id, leadId: lead.id, mailboxId: historyMailbox.id, direction: "OUTBOUND", status: "SENT", fromEmail: historyMailbox.email, toEmail: lead.email, subject: "s", body: "b", draftId: draft.id, sentAt },
+      });
+      if (replied) {
+        await prisma.message.create({
+          data: { orgId: monroe.id, leadId: lead.id, mailboxId: historyMailbox.id, direction: "INBOUND", status: "RECEIVED", fromEmail: lead.email, toEmail: historyMailbox.email, subject: "re", body: "yes, interested!", receivedAt: sentAt },
+        });
+      }
+    }
+
+    // GOOD opener @ 9am converts well; BASELINE @ 3pm (incl. holdout) lags.
+    for (let i = 0; i < 12; i++) await seedOutcome(i, GOOD, 9, i < 9, i < 3, "TREATMENT");
+    for (let i = 0; i < 8; i++) await seedOutcome(i + 100, BASELINE, 15, i < 2, false, i < 4 ? "HOLDOUT" : "TREATMENT");
+
+    await runReflection(monroe.id);
+    // Apply the send-time insight so the agent visibly "updated itself".
+    const shift = await prisma.insight.findFirst({ where: { orgId: monroe.id, kind: "SHIFT_SENDTIME", status: "PROPOSED" } });
+    if (shift) await applyInsight(monroe.id, shift.id, jessica.id);
   }
 
   console.log("Seed complete:");

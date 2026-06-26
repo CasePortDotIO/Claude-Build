@@ -4,6 +4,7 @@ import { retrieveSimilar } from "@/lib/memory";
 import { estimateCostUsd } from "@/lib/ai/config";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
+import { assignCohort } from "@/lib/agent/rollups";
 import type { DraftInput, VoiceProfileShape } from "@/lib/ai/types";
 import type { Lead } from "@prisma/client";
 
@@ -71,10 +72,17 @@ export async function generateDraftsForLead(opts: {
     .join(" ")
     .trim() || (lead.firstName ?? lead.email);
 
-  const [voiceSamples, similarObjections] = await Promise.all([
+  const [voiceSamples, similarObjections, learning] = await Promise.all([
     retrieveSimilar({ orgId, query: retrievalQuery, k: 3, kinds: ["VOICE_SAMPLE"] }),
     retrieveSimilar({ orgId, query: retrievalQuery, k: 3, kinds: ["OBJECTION"] }),
+    prisma.orgLearning.findUnique({ where: { orgId } }),
   ]);
+
+  // M6: stable A/B cohort. HOLDOUT leads get baseline copy so lift is measured.
+  const cohort = lead.cohort ?? assignCohort(orgId, lead.id);
+  if (lead.cohort !== cohort) {
+    await prisma.lead.update({ where: { id: lead.id }, data: { cohort } });
+  }
 
   const input: DraftInput = {
     lead: {
@@ -91,6 +99,8 @@ export async function generateDraftsForLead(opts: {
     voiceSamples: voiceSamples.map((m) => m.content),
     similarObjections: similarObjections.map((m) => m.content),
     variantCount,
+    cohort,
+    retiredPhrases: learning?.retiredPhrases ?? [],
   };
 
   // Reason: call the provider (Claude or stub).

@@ -31,6 +31,10 @@ export interface DraftInput {
   voiceSamples: string[]; // retrieved exemplars of the operator's voice
   similarObjections: string[]; // retrieved similar past objections
   variantCount: number; // 2–3
+  // M6 self-improvement: HOLDOUT leads get baseline copy (control); the agent's
+  // learned phrasing is reserved for TREATMENT so lift is measurable.
+  cohort?: "TREATMENT" | "HOLDOUT";
+  retiredPhrases?: string[]; // openers the agent learned to avoid
 }
 
 export interface DraftVariantOut {

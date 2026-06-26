@@ -11,13 +11,14 @@ time.
 
 ---
 
-## Status — v1 shipped ✅ (Milestones 1–5 = definition of done)
+## Status — v1 shipped ✅ + M6 self-improvement
 
 **M1: Schema + auth + multi-tenant org model + CSV import + lead table UI.**
 **M2: Voice profile + memory/pgvector + Claude draft engine + Approval queue.**
 **M3: Mailbox send + reply detection + lead state machine + Conversations UI.**
 **M4: Cal.com booking + booking detection + Command Center KPIs/activity feed.**
 **M5: Compliance rails (opt-out, suppression, CAN-SPAM, caps, warmup) + Deliverability.**
+**M6: Self-improvement — nightly reflection, "what it taught itself" log, A/B holdout.**
 
 > **v1 acceptance:** create an org → import prior leads → the agent drafts a
 > personalized re-engagement email grounded in real memory → approve/edit →
@@ -74,11 +75,18 @@ What works right now, end-to-end:
   mailbox + calendar. Add the keys to switch to Claude + Voyage + real Gmail +
   Cal.com with zero code changes.
 
+- **Self-improvement, bounded (M6).** A nightly **reflection** job analyzes real
+  outcomes (reply/booking rate by **opener** and **send-hour**) and proposes
+  **metric-justified** changes — only to copy/timing, never identity/compliance.
+  Each proposal is **apply/veto** and logged to a *"what it taught itself"* trail.
+  A deterministic **~15% A/B holdout** measures lift against a control, so
+  improvement is **measured, not asserted**. The Command Center's "agent updated
+  itself" card shows the latest applied change.
+
 ### What's still to come
 
 | Area | Milestone |
 | --- | --- |
-| Self-improvement reflection job + "what it taught itself" log + A/B | M6 |
 | Microsoft Graph, Calendly, HubSpot/Sheets/Mailchimp/Kajabi importers | M7 |
 | Reseller / white-label roll-up screens | M8 |
 

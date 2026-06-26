@@ -140,14 +140,20 @@ export class StubProvider implements LLMProvider {
     const goal = lead.statedGoal?.trim();
     const inquiry = lead.originalInquiry?.trim();
 
+    // HOLDOUT (A/B control): use a neutral baseline opener instead of the
+    // agent's learned goal-led phrasing, so any lift is measured, not assumed.
+    const isHoldout = input.cohort === "HOLDOUT";
+
     const angles: { angle: string; opener: string; ask: string; base: number }[] = [
       {
-        angle: "goal-led",
-        opener: goal
-          ? `Back when we first spoke, you were focused on ${lowerFirst(goal)}.`
-          : inquiry
-            ? `A while back you reached out about ${lowerFirst(inquiry)}.`
-            : `It's been a little while since we last connected.`,
+        angle: isHoldout ? "baseline" : "goal-led",
+        opener: isHoldout
+          ? `Just checking in — wanted to see if you're still interested.`
+          : goal
+            ? `Back when we first spoke, you were focused on ${lowerFirst(goal)}.`
+            : inquiry
+              ? `A while back you reached out about ${lowerFirst(inquiry)}.`
+              : `It's been a little while since we last connected.`,
         ask: `Is that still where your head's at? If so, I'd love to help — want me to send over a simple next step?`,
         base: goal ? 0.84 : 0.66,
       },
@@ -169,7 +175,14 @@ export class StubProvider implements LLMProvider {
       },
     ];
 
-    const chosen = angles.slice(0, Math.max(2, Math.min(3, input.variantCount)));
+    // Drop any angle whose opener matches a phrase the agent learned to retire
+    // (§8), unless that would leave us with too few variants.
+    const retired = (input.retiredPhrases ?? []).map((p) => p.toLowerCase());
+    const isRetired = (opener: string) => retired.some((p) => p && opener.toLowerCase().includes(p));
+    const filtered = isHoldout ? angles : angles.filter((a) => !isRetired(a.opener));
+    const pool = filtered.length >= 2 ? filtered : angles;
+
+    const chosen = pool.slice(0, Math.max(2, Math.min(3, input.variantCount)));
     const variants: DraftVariantOut[] = chosen.map((a, i) => {
       const body = [`${greeting}`, ``, a.opener, ``, a.ask, ``, signOff, ``, optOutLine].join("\n");
       const subject = subjectFor(a.angle, lead);
