@@ -13,7 +13,7 @@ import type { DailyBrief } from "@/lib/retention";
  * list, and daily caps — none of which apply to emailing a coach their own recap.
  * Best-effort and idempotent per day; never throws into the nightly job.
  */
-export async function emailMorningBrief(orgId: string, brief: DailyBrief): Promise<{ emailed: number; skipped?: string }> {
+export async function emailMorningBrief(orgId: string, brief: DailyBrief, streakCurrent = 0): Promise<{ emailed: number; skipped?: string }> {
   if (!brief.hasActivity) return { emailed: 0, skipped: "quiet night" };
 
   // Idempotent per calendar day — a re-run of the cron won't double-send.
@@ -33,7 +33,7 @@ export async function emailMorningBrief(orgId: string, brief: DailyBrief): Promi
 
   const org = await prisma.org.findUnique({ where: { id: orgId }, select: { name: true, brandName: true } });
   const brand = org?.brandName || org?.name || "The Warm Sweep";
-  const { subject, body } = renderBrief(brief, brand);
+  const { subject, body } = renderBrief(brief, brand, streakCurrent);
 
   const provider = getMailboxProvider(mailbox.provider);
   let emailed = 0;
@@ -53,7 +53,7 @@ export async function emailMorningBrief(orgId: string, brief: DailyBrief): Promi
 }
 
 /** Plain-text brief — reliable across Gmail/Microsoft without MIME gymnastics. */
-export function renderBrief(brief: DailyBrief, brand: string): { subject: string; body: string } {
+export function renderBrief(brief: DailyBrief, brand: string, streakCurrent = 0): { subject: string; body: string } {
   const headline =
     brief.booked > 0
       ? `${brief.booked} call${brief.booked === 1 ? "" : "s"} booked${brief.recoveredCents > 0 ? `, ${formatMoney(brief.recoveredCents)} reactivated` : ""}`
@@ -84,6 +84,9 @@ export function renderBrief(brief: DailyBrief, brand: string): { subject: string
     );
   } else {
     lines.push(``, base ? `Start your next sweep: ${base}/leads` : `Open The Warm Sweep to start your next sweep.`);
+  }
+  if (streakCurrent >= 2) {
+    lines.push(``, `🔥 You're on a ${streakCurrent}-day streak. Review today to keep the chain going.`);
   }
   lines.push(``, `— ${brand}`, `You're receiving this because you run a workspace here. It only sends on days with activity.`);
   return { subject, body: lines.join("\n") };

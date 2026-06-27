@@ -280,6 +280,21 @@ async function main() {
     create: { orgId: monroe.id, provider: "HUBSPOT", status: "CONNECTED", config: {} },
   });
 
+  // ── M10: seed a 5-day review streak for Monroe (draft.approve audit rows on
+  // each of the last five days, including today) so the "don't break the chain"
+  // mechanic has a live chain to show. Idempotent: clear prior seeded rows first.
+  await prisma.auditLog.deleteMany({ where: { orgId: monroe.id, action: "draft.approve", actorId: jessica.id } });
+  const DAY = 86_400_000;
+  await prisma.auditLog.createMany({
+    data: Array.from({ length: 5 }, (_, i) => ({
+      orgId: monroe.id,
+      actorId: jessica.id,
+      action: "draft.approve",
+      targetType: "Draft",
+      createdAt: new Date(Date.now() - i * DAY),
+    })),
+  });
+
   console.log("Seed complete:");
   console.log("  Agency:  Delegate and Done");
   console.log("  Client A: Monroe Coaching  — login jessica@monroe.coach / warmsweep123  (4 leads)");

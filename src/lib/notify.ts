@@ -25,7 +25,7 @@ async function postSlack(orgId: string, text: string): Promise<boolean> {
  * external trigger of the habit loop — it pulls the operator back in each day
  * with the overnight story. Skips silently on quiet nights so it never nags.
  */
-export async function notifyMorningBrief(orgId: string, brief: DailyBrief): Promise<{ slack: boolean }> {
+export async function notifyMorningBrief(orgId: string, brief: DailyBrief, streakCurrent = 0): Promise<{ slack: boolean }> {
   if (!brief.hasActivity) return { slack: false };
   const lines = [
     `☀️ *Your Warm Sweep — overnight brief*`,
@@ -34,6 +34,7 @@ export async function notifyMorningBrief(orgId: string, brief: DailyBrief): Prom
   if (brief.recoveredCents > 0) lines.push(`• ${formatMoney(brief.recoveredCents)} reactivated (${formatMoney(brief.cumulativeRecoveredCents)} all-time)`);
   if (brief.latestInsight) lines.push(`• 🧠 It learned: ${brief.latestInsight.body}`);
   if (brief.pendingApprovals > 0) lines.push(`• ✍️ ${brief.pendingApprovals} draft${brief.pendingApprovals === 1 ? "" : "s"} need your nod`);
+  if (streakCurrent >= 2) lines.push(`• 🔥 ${streakCurrent}-day streak — review today to keep it alive`);
   return { slack: await postSlack(orgId, lines.join("\n")) };
 }
 

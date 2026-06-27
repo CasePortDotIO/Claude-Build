@@ -8,6 +8,7 @@ import { FirstRunGuide } from "@/components/magic/FirstRunGuide";
 import { BookingCelebration } from "@/components/magic/BookingCelebration";
 import { MorningBrief } from "@/components/magic/MorningBrief";
 import { dailyBrief } from "@/lib/retention";
+import { engagementStreak } from "@/lib/streak";
 
 // Command Center — real data (M4). KPI row, reactivations chart, live activity
 // feed, and the latest agent action. The "agent updated itself" self-improvement
@@ -23,6 +24,7 @@ export default async function CommandCenter() {
     latestBooking(ctx.orgId),
     dailyBrief(ctx.orgId),
   ]);
+  const streak = await engagementStreak(ctx.orgId);
   const today = new Date().toISOString().slice(0, 10); // per-day collapse key for the brief
 
   const maxBar = Math.max(1, ...chart.map((b) => b.value));
@@ -51,7 +53,7 @@ export default async function CommandCenter() {
         {!firstRun.complete && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
 
         {/* M10: the daily habit loop — what the agent did overnight */}
-        {firstRun.complete && <MorningBrief brief={brief} dateKey={today} />}
+        {firstRun.complete && <MorningBrief brief={brief} streak={streak} dateKey={today} />}
 
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">

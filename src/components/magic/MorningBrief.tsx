@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
 import type { DailyBrief } from "@/lib/retention";
+import type { StreakState } from "@/lib/streak";
 
 /**
  * The Morning Brief (M10) — the habit loop's daily payoff. The nightly agent run
@@ -12,7 +13,7 @@ import type { DailyBrief } from "@/lib/retention";
  * occasional tool into a daily ritual. Collapses once per calendar day so it
  * greets, never nags — re-expands tomorrow with a new overnight story.
  */
-export function MorningBrief({ brief, dateKey }: { brief: DailyBrief; dateKey: string }) {
+export function MorningBrief({ brief, streak, dateKey }: { brief: DailyBrief; streak: StreakState; dateKey: string }) {
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
@@ -46,6 +47,11 @@ export function MorningBrief({ brief, dateKey }: { brief: DailyBrief; dateKey: s
       >
         <span className="text-[16px]">☀️</span>
         <span className="text-[13.5px] font-semibold text-ink">Your morning brief</span>
+        {streak.current > 0 && (
+          <span className="flex items-center gap-1 rounded-full bg-[#fdf0e8] px-2 py-0.5 text-[12px] font-semibold text-ember">
+            🔥 {streak.current}
+          </span>
+        )}
         <span className="text-[12.5px] text-muted-2">
           {brief.drafted} drafted · {brief.replied} replied · {brief.booked} booked
           {brief.pendingApprovals > 0 && ` · ${brief.pendingApprovals} awaiting you`}
@@ -69,6 +75,8 @@ export function MorningBrief({ brief, dateKey }: { brief: DailyBrief; dateKey: s
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 15l-6-6-6 6" /></svg>
         </button>
       </div>
+
+      <StreakBar streak={streak} />
 
       <div className="px-6 py-5">
         {brief.hasActivity ? (
@@ -125,6 +133,53 @@ export function MorningBrief({ brief, dateKey }: { brief: DailyBrief; dateKey: s
           </Link>
         )}
       </div>
+    </div>
+  );
+}
+
+const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+
+function StreakBar({ streak }: { streak: StreakState }) {
+  const headline =
+    streak.current === 0
+      ? "Start a streak — review a draft today"
+      : streak.activeToday
+        ? `🔥 ${streak.current}-day streak — kept alive today`
+        : `🔥 ${streak.current}-day streak — review today to keep it going`;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-6 py-3 ${
+        streak.atRisk ? "border-[#f0dcc9] bg-[#fdf4ec]" : "border-line-2 bg-cream"
+      }`}
+    >
+      <span className={`text-[13px] font-semibold ${streak.atRisk ? "text-ember" : streak.current > 0 ? "text-ink" : "text-muted-2"}`}>
+        {headline}
+      </span>
+
+      {/* week tracker — the chain you don't want to break */}
+      <div className="flex items-center gap-1.5">
+        {streak.week.map((d) => (
+          <div key={d.date} className="flex flex-col items-center gap-1">
+            <span
+              title={d.date}
+              className={`flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-semibold ${
+                d.active
+                  ? "bg-sweep text-white"
+                  : d.isToday
+                    ? "border-2 border-dashed border-ember bg-white text-ember"
+                    : "bg-white text-muted-3 ring-1 ring-line-2"
+              }`}
+            >
+              {d.active ? "✓" : DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {streak.longest > streak.current && (
+        <span className="text-[11.5px] text-muted-3">best: {streak.longest} days</span>
+      )}
     </div>
   );
 }

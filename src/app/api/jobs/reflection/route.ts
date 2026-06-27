@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { runReflection } from "@/lib/agent/reflection";
 import { reengagementSweep } from "@/lib/agent/maintenance";
 import { dailyBrief } from "@/lib/retention";
+import { engagementStreak } from "@/lib/streak";
 import { notifyMorningBrief } from "@/lib/notify";
 import { emailMorningBrief } from "@/lib/agent/digest";
 
@@ -39,9 +40,10 @@ async function runJob(req: NextRequest) {
     totalCooled += sweep.cooled;
     // M10: the overnight Morning Brief — the habit-loop trigger, on every channel.
     const brief = await dailyBrief(org.id);
-    const slack = await notifyMorningBrief(org.id, brief);
+    const streak = await engagementStreak(org.id);
+    const slack = await notifyMorningBrief(org.id, brief, streak.current);
     if (slack.slack) briefsPushed++;
-    const email = await emailMorningBrief(org.id, brief);
+    const email = await emailMorningBrief(org.id, brief, streak.current);
     briefsEmailed += email.emailed;
   }
   return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed, briefsEmailed });

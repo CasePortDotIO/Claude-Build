@@ -283,3 +283,17 @@ emailing a coach their own recap. Idempotent per calendar day (audit-logged),
 activity-gated (silent on quiet nights), best-effort (never throws into the
 nightly job). Wired into the reflection cron next to the Slack push; the route
 now reports `briefsEmailed`. Tests 109 → 113.
+
+### M10.2 · Engagement streak — "don't break the chain"
+A streak mechanic on the Morning Brief (`lib/streak.ts`, `StreakBar`). Computed
+as a *view* over the audit trail — no stored counter to drift — where an "active
+day" is real operator work: reviewing a draft (approve OR reject) or running a
+sweep. **Rejecting counts on purpose** so the streak never pressures anyone into
+approving a draft they shouldn't; the qualifying action is *engagement*, not
+saying yes. (Added a `draft.reject` audit row to support this — also a genuine
+audit-trail improvement.) 1-day grace keeps the streak alive until end of day;
+`atRisk` drives the "review today to keep it going" nudge, with a 7-day chain
+tracker. The current count rides along on the Slack + email triggers too
+(loss-aversion via the daily nudge). UTC day boundaries for v1 (no stored tz).
+Seed plants a 5-day streak for Monroe so the demo shows a live chain.
+Tests 113 → 118.

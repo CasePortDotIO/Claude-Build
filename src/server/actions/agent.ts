@@ -150,6 +150,11 @@ export async function rejectDraftAction(raw: unknown): Promise<AgentActionResult
     }),
     // Send the lead back to RESEARCHED so it can be re-drafted.
     prisma.lead.update({ where: { id: draft.leadId }, data: { status: "RESEARCHED" } }),
+    // Audit the review either way — rejecting is engagement too, and keeps the
+    // streak honest: reviewing counts, not specifically saying yes.
+    prisma.auditLog.create({
+      data: { orgId: ctx.orgId, actorId: ctx.userId, action: "draft.reject", targetType: "Draft", targetId: draft.id },
+    }),
   ]);
 
   revalidatePath("/approvals");
