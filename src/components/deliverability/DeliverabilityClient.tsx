@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { suppressEmailAction, resumeMailboxAction, setMailingAddressAction } from "@/server/actions/compliance";
+import { rescrubAndResumeAction } from "@/server/actions/mailbox";
 
 export interface MailboxHealthVM {
   id: string;
@@ -16,6 +17,9 @@ export interface MailboxHealthVM {
   warmupDay: number;
   warming: boolean;
   bounceRatePct: number;
+  alert: "ok" | "alert";
+  alertReason: string | null;
+  requiresRescrub: boolean;
 }
 
 export interface SuppressionVM {
@@ -95,10 +99,20 @@ export function DeliverabilityClient({
                     <span className="rounded-md bg-[rgba(180,60,60,0.1)] px-2 py-1 text-[11.5px] font-semibold text-[#b43c3c]" title={m.pausedReason ?? ""}>
                       Auto-paused
                     </span>
-                    <button disabled={pending} onClick={() => run(() => resumeMailboxAction(m.id))} className="rounded-lg border border-line-3 bg-white px-3 py-1.5 text-[12px] font-semibold text-muted hover:bg-cream">
-                      Resume
-                    </button>
+                    {m.requiresRescrub ? (
+                      <button disabled={pending} onClick={() => run(() => rescrubAndResumeAction(m.id))} title="Re-verifies your list, then resumes" className="rounded-lg bg-ember px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-ember-hover disabled:opacity-50">
+                        Re-scrub &amp; resume
+                      </button>
+                    ) : (
+                      <button disabled={pending} onClick={() => run(() => resumeMailboxAction(m.id))} className="rounded-lg border border-line-3 bg-white px-3 py-1.5 text-[12px] font-semibold text-muted hover:bg-cream">
+                        Resume
+                      </button>
+                    )}
                   </div>
+                ) : m.alert === "alert" ? (
+                  <span className="rounded-md bg-[#fdf0e8] px-2 py-1 text-[11.5px] font-semibold text-ember" title={m.alertReason ?? ""}>
+                    Watch — {m.alertReason}
+                  </span>
                 ) : (
                   <span className="rounded-md bg-[rgba(27,122,87,0.08)] px-2 py-1 text-[11.5px] font-semibold text-sweep">Healthy</span>
                 )}

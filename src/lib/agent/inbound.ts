@@ -218,7 +218,9 @@ async function recordBounceAndMaybePause(mailboxId: string) {
   const mb = await prisma.mailbox.update({ where: { id: mailboxId }, data: { bounceCount: { increment: 1 } } });
   const decision = autoPauseDecision(mb);
   if (decision.pause && mb.status === "CONNECTED") {
-    await prisma.mailbox.update({ where: { id: mailboxId }, data: { status: "PAUSED", pausedReason: decision.reason } });
+    // §4 circuit breaker: pause AND require a list re-scrub before resuming, so a
+    // naive un-pause can't keep burning the domain on the same dirty list.
+    await prisma.mailbox.update({ where: { id: mailboxId }, data: { status: "PAUSED", pausedReason: decision.reason, requiresRescrub: true } });
     await prisma.auditLog.create({ data: { orgId: mb.orgId, action: "mailbox.autopause", targetType: "Mailbox", targetId: mailboxId, metadata: { reason: decision.reason } } });
   }
 }
@@ -227,7 +229,9 @@ async function recordComplaintAndMaybePause(mailboxId: string) {
   const mb = await prisma.mailbox.update({ where: { id: mailboxId }, data: { complaintCount: { increment: 1 } } });
   const decision = autoPauseDecision(mb);
   if (decision.pause && mb.status === "CONNECTED") {
-    await prisma.mailbox.update({ where: { id: mailboxId }, data: { status: "PAUSED", pausedReason: decision.reason } });
+    // §4 circuit breaker: pause AND require a list re-scrub before resuming, so a
+    // naive un-pause can't keep burning the domain on the same dirty list.
+    await prisma.mailbox.update({ where: { id: mailboxId }, data: { status: "PAUSED", pausedReason: decision.reason, requiresRescrub: true } });
     await prisma.auditLog.create({ data: { orgId: mb.orgId, action: "mailbox.autopause", targetType: "Mailbox", targetId: mailboxId, metadata: { reason: decision.reason } } });
   }
 }

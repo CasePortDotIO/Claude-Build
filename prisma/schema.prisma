@@ -51,6 +51,11 @@ model Org {
   brandColor   String?
   fromDomain   String?
 
+  // §4: a custom sending domain cannot enter active sending until SPF + DMARC
+  // verify. Cached from the DNS check so send-time enforcement is cheap.
+  domainAuthOk        Boolean   @default(false)
+  domainAuthCheckedAt DateTime?
+
   // M8 per-seat billing (what the agency charges this client).
   clientPriceCents Int    @default(0)
   seats            Int    @default(1)
@@ -539,6 +544,11 @@ model Mailbox {
   bounceCount    Int @default(0)
   complaintCount Int @default(0)
   pausedReason   String?
+
+  // §4 circuit breaker: set when the bounce/complaint hard-stop trips. Sending
+  // cannot resume until the operator re-scrubs the list (§3) — one bad list must
+  // not be allowed to keep burning the domain on a naive un-pause.
+  requiresRescrub Boolean @default(false)
 
   messages      Message[]
   conversations Conversation[]

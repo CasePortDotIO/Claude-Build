@@ -3,6 +3,7 @@ import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
 import { transition } from "@/lib/agent/state-machine";
 import { assertContactable, ComplianceError, complianceFooter, withComplianceFooter, unsubscribeUrl } from "@/lib/compliance";
 import { effectiveDailyCap, isWarmingUp } from "@/lib/compliance/caps";
+import { assertDomainAuthorized, DomainAuthError } from "@/lib/compliance/deliverability";
 import type { Mailbox } from "@prisma/client";
 
 export class SendError extends Error {
@@ -67,6 +68,14 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
     throw new SendError("Set your physical mailing address (Connections) before sending — required by CAN-SPAM.");
   }
   const brand = org.brandName || org.name;
+
+  // §4: a custom sending domain must pass SPF + DMARC before any send.
+  try {
+    await assertDomainAuthorized(orgId);
+  } catch (e) {
+    if (e instanceof DomainAuthError) throw new SendError(e.message);
+    throw e;
+  }
 
   let mailbox = await prisma.mailbox.findFirst({ where: { orgId, status: "CONNECTED" }, orderBy: { createdAt: "asc" } });
   if (!mailbox) throw new SendError("No connected mailbox. Connect one under Connections first.");

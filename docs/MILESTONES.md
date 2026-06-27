@@ -346,3 +346,33 @@ end. No refactor needed; swapping transport to Resend would be a separate decisi
 - §5 confidence gate / conservative qualification hardening · §6 booking
   timezone/buffers + no-show reminders + lifecycle status · §7 onboarding · §8
   guarantee tracker (single `[X]` config) · §9 one-click cancel · §10 outcome log.
+
+---
+
+## M12 — [P0] §4 deliverability enforcement gaps (circuit breaker + domain auth)
+
+M5 already shipped warmup ramp + bounce/complaint auto-pause. M12 closes the
+explicit §4 acceptance gaps:
+
+- **Block send until domain auth passes.** A custom sending domain (`Org.fromDomain`)
+  cannot send until SPF + DMARC verify. `assertDomainAuthorized` gates `send.ts`;
+  the result is cached on `Org.domainAuthOk` (refreshed + persisted whenever the
+  Deliverability page loads) so the send-time check is a boolean read, not a DNS
+  lookup per message. No custom domain → provider-managed (Gmail/MS), nothing to
+  block.
+- **Circuit-breaker re-scrub requirement.** When the bounce/complaint hard-stop
+  trips, the mailbox is paused AND flagged `requiresRescrub`. A plain un-pause is
+  refused (`resumeMailboxAction` errors); the only way back is
+  `rescrubAndResumeAction`, which re-verifies the whole unsent list (§3), resets
+  the bounce/complaint window, and reconnects. One bad list can't keep burning the
+  domain on a naive resume.
+- **Two-tier thresholds.** Split alert (bounce 2% / complaint 0.1%) from hard-stop
+  (bounce 5% / complaint 0.3%). `rateAlert` surfaces an early "Watch" badge on
+  Deliverability before the breaker trips.
+
+Acceptance criteria met: sending blocked on unauthenticated custom domains; a
+simulated high bounce/complaint auto-pauses only the offending mailbox and forces
+a re-scrub before resuming. Tests 127 → 134.
+
+**P0 (§3 + §4) is complete.** Next: P1 — §6 booking quality (timezone/buffers +
+no-show reminders + lifecycle status) and §8 guarantee tracker.

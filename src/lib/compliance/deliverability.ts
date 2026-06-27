@@ -1,6 +1,6 @@
 import { resolveTxt } from "node:dns/promises";
 import { prisma } from "@/lib/prisma";
-import { bounceRate, complaintRate, effectiveDailyCap, warmupDay, isWarmingUp } from "@/lib/compliance/caps";
+import { bounceRate, complaintRate, effectiveDailyCap, warmupDay, isWarmingUp, rateAlert } from "@/lib/compliance/caps";
 
 /**
  * Deliverability signals for the Deliverability view (§9). Computes a real
@@ -35,6 +35,47 @@ export async function checkDomainAuth(domain: string | null): Promise<DomainAuth
   }
 }
 
+/**
+ * §4: refresh + persist the custom domain's auth status. SPF + DMARC must verify
+ * before a custom sending domain may send; we cache the result on the org so the
+ * send-time gate is a cheap boolean read, not a DNS lookup per message. DKIM
+ * selectors are provider-specific and can't be checked blind, so the gate keys
+ * on SPF + DMARC (the two we can verify), with DKIM surfaced as UI guidance.
+ */
+export async function refreshDomainAuth(orgId: string): Promise<DomainAuth> {
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { fromDomain: true } });
+  const auth = await checkDomainAuth(org?.fromDomain ?? null);
+  const ok = auth.checked && auth.spf && auth.dmarc;
+  await prisma.org.update({ where: { id: orgId }, data: { domainAuthOk: ok, domainAuthCheckedAt: new Date() } });
+  return auth;
+}
+
+/**
+ * The send-time gate (§4): a custom sending domain cannot send until SPF + DMARC
+ * verify. When no custom domain is set, sending goes through the connected
+ * provider (Gmail/Microsoft), whose domain auth the provider manages — so there
+ * is nothing to block. Throws DomainAuthError with a fix-it message otherwise.
+ */
+export class DomainAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DomainAuthError";
+  }
+}
+
+export async function assertDomainAuthorized(orgId: string): Promise<void> {
+  const org = await prisma.org.findUnique({
+    where: { id: orgId },
+    select: { fromDomain: true, domainAuthOk: true },
+  });
+  if (!org?.fromDomain) return; // provider-managed domain — nothing to verify
+  if (!org.domainAuthOk) {
+    throw new DomainAuthError(
+      `Sending is blocked for ${org.fromDomain} until SPF and DMARC are verified. Add the DNS records, then re-check on the Deliverability page.`,
+    );
+  }
+}
+
 export interface MailboxHealth {
   id: string;
   email: string;
@@ -50,6 +91,9 @@ export interface MailboxHealth {
   hourlyCap: number;
   warmupDay: number;
   warming: boolean;
+  alert: "ok" | "alert"; // early-warning tier (before hard-stop)
+  alertReason: string | null;
+  requiresRescrub: boolean;
 }
 
 export interface DeliverabilitySummary {
@@ -119,6 +163,9 @@ export async function deliverabilitySummary(orgId: string): Promise<Deliverabili
       hourlyCap: m.hourlyCap,
       warmupDay: warmupDay(m),
       warming: isWarmingUp(m),
+      alert: rateAlert(m).level,
+      alertReason: rateAlert(m).reason ?? null,
+      requiresRescrub: m.requiresRescrub,
     })),
   };
 }

@@ -50,6 +50,14 @@ export async function setMailingAddressAction(address: string): Promise<Complian
 /** Resume an auto-paused (or manually paused) mailbox. */
 export async function resumeMailboxAction(mailboxId: string): Promise<ComplianceActionResult> {
   const ctx = await requireOrg();
+  // §4 circuit breaker: a mailbox tripped by the bounce/complaint hard-stop can
+  // only resume via rescrubAndResumeAction — a plain un-pause must not bypass the
+  // re-scrub requirement and keep burning the domain.
+  const mb = await prisma.mailbox.findFirst({ where: { id: mailboxId, orgId: ctx.orgId }, select: { requiresRescrub: true } });
+  if (!mb) return { ok: false, error: "Mailbox not found in this workspace." };
+  if (mb.requiresRescrub) {
+    return { ok: false, error: "This mailbox tripped the deliverability circuit breaker. Re-scrub your list to resume." };
+  }
   await prisma.mailbox.updateMany({ where: { id: mailboxId, orgId: ctx.orgId }, data: { status: "CONNECTED", pausedReason: null } });
   revalidatePath("/deliverability");
   revalidatePath("/connections");

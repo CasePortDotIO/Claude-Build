@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOrg } from "@/lib/auth-helpers";
 import { sendApprovedDraft, sendAllApproved, SendError } from "@/lib/agent/send";
 import { ingestInboundEmail } from "@/lib/agent/inbound";
+import { reverifyStale } from "@/lib/agent/maintenance";
 import { simulatedLeadReply } from "@/lib/mailbox/simulation";
 import { getMailboxProvider, mailboxContext, hasGoogleOAuth } from "@/lib/mailbox";
 
@@ -33,6 +34,31 @@ export async function disconnectMailboxAction(mailboxId: string): Promise<Mailbo
   await prisma.mailbox.updateMany({ where: { id: mailboxId, orgId: ctx.orgId }, data: { status: "DISCONNECTED" } });
   revalidatePath("/connections");
   return { ok: true, message: "Mailbox disconnected." };
+}
+
+/**
+ * §4 circuit-breaker reset: the ONLY way a hard-stopped mailbox resumes. Re-scrubs
+ * the still-unsent list (§3 verification) FIRST, then clears the rescrub flag,
+ * resets the bounce/complaint window so the cleaned list is measured fresh, and
+ * reconnects. A naive un-pause is deliberately not offered — one bad list must
+ * not be allowed to keep burning the domain.
+ */
+export async function rescrubAndResumeAction(mailboxId: string): Promise<MailboxActionResult> {
+  const ctx = await requireOrg();
+  const mb = await prisma.mailbox.findFirst({ where: { id: mailboxId, orgId: ctx.orgId } });
+  if (!mb) return { ok: false, error: "Mailbox not found in this workspace." };
+
+  const scrub = await reverifyStale(ctx.orgId, 0); // re-verify everything unsent now
+  await prisma.mailbox.update({
+    where: { id: mb.id },
+    data: { status: "CONNECTED", pausedReason: null, requiresRescrub: false, bounceCount: 0, complaintCount: 0 },
+  });
+  await prisma.auditLog.create({
+    data: { orgId: ctx.orgId, actorId: ctx.userId, action: "mailbox.rescrub_resume", targetType: "Mailbox", targetId: mb.id, metadata: { rechecked: scrub.rechecked, newlyInvalid: scrub.newlyInvalid } },
+  });
+  revalidatePath("/deliverability");
+  revalidatePath("/connections");
+  return { ok: true, message: `List re-scrubbed (${scrub.rechecked} re-checked, ${scrub.newlyInvalid} removed). Sending resumed.` };
 }
 
 /** Send one approved draft now (the irreversible action — gated by approval). */

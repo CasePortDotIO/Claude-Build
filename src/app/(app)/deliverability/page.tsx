@@ -1,12 +1,15 @@
 import { requireOrg } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { Topbar } from "@/components/nav/Topbar";
-import { deliverabilitySummary } from "@/lib/compliance/deliverability";
+import { deliverabilitySummary, refreshDomainAuth } from "@/lib/compliance/deliverability";
 import { DeliverabilityClient, type MailboxHealthVM, type SuppressionVM } from "@/components/deliverability/DeliverabilityClient";
 import { timeAgo } from "@/lib/format";
 
 export default async function DeliverabilityPage() {
   const ctx = await requireOrg();
+  // §4: refresh + persist the custom-domain auth flag so the send-time gate stays
+  // current whenever the operator views this page.
+  await refreshDomainAuth(ctx.orgId);
   const [summary, suppressions, org] = await Promise.all([
     deliverabilitySummary(ctx.orgId),
     prisma.suppressionEntry.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "desc" }, take: 25 }),
@@ -25,6 +28,9 @@ export default async function DeliverabilityPage() {
     warmupDay: m.warmupDay,
     warming: m.warming,
     bounceRatePct: m.bounceRatePct,
+    alert: m.alert,
+    alertReason: m.alertReason,
+    requiresRescrub: m.requiresRescrub,
   }));
   const suppressionVMs: SuppressionVM[] = suppressions.map((s) => ({ email: s.email, reason: s.reason, when: timeAgo(s.createdAt) }));
 
