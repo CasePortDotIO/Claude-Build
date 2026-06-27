@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { BOOKED_STATUSES } from "@/lib/booking-status";
 
 // Command Center metrics + activity feed, all org-scoped. Pure reads.
 
@@ -13,8 +14,8 @@ export interface CommandCenterKpis {
 
 export async function commandCenterKpis(orgId: string): Promise<CommandCenterKpis> {
   const [revenue, callsBooked, contacted, replied, active] = await Promise.all([
-    prisma.booking.aggregate({ where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } }, _sum: { valueCents: true } }),
-    prisma.booking.count({ where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } } }),
+    prisma.booking.aggregate({ where: { orgId, status: { in: BOOKED_STATUSES } }, _sum: { valueCents: true } }),
+    prisma.booking.count({ where: { orgId, status: { in: BOOKED_STATUSES } } }),
     // "Contacted" = at least one outbound message went out.
     prisma.message.findMany({ where: { orgId, direction: "OUTBOUND" }, distinct: ["leadId"], select: { leadId: true } }),
     prisma.message.findMany({ where: { orgId, direction: "INBOUND", isAutoReply: false, isBounce: false }, distinct: ["leadId"], select: { leadId: true } }),
@@ -76,7 +77,7 @@ export interface LatestBooking {
 
 export async function latestBooking(orgId: string): Promise<LatestBooking | null> {
   const b = await prisma.booking.findFirst({
-    where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } },
+    where: { orgId, status: { in: BOOKED_STATUSES } },
     orderBy: { createdAt: "desc" },
     include: { lead: { select: { firstName: true, lastName: true, email: true, createdAt: true } } },
   });

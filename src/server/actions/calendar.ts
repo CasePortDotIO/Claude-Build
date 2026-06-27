@@ -15,6 +15,28 @@ export interface CalendarActionResult {
   slots?: { startsAt: string; label: string }[];
 }
 
+const OUTCOMES = ["SHOWED", "NO_SHOW", "RESCHEDULED", "CANCELED"] as const;
+type Outcome = (typeof OUTCOMES)[number];
+
+/**
+ * §6: record a call's outcome (showed / no-show / rescheduled / cancelled) so the
+ * booking lifecycle is real data — and the guarantee's show-rate is reconciled,
+ * not assumed. Org-scoped.
+ */
+export async function markBookingOutcomeAction(bookingId: string, outcome: Outcome): Promise<CalendarActionResult> {
+  const ctx = await requireOrg();
+  if (!OUTCOMES.includes(outcome)) return { ok: false, error: "Unknown outcome." };
+  const b = await prisma.booking.findFirst({ where: { id: bookingId, orgId: ctx.orgId }, select: { id: true } });
+  if (!b) return { ok: false, error: "Booking not found in this workspace." };
+  await prisma.booking.update({ where: { id: b.id }, data: { status: outcome } });
+  await prisma.auditLog.create({
+    data: { orgId: ctx.orgId, actorId: ctx.userId, action: "booking.outcome", targetType: "Booking", targetId: b.id, metadata: { outcome } },
+  });
+  revalidatePath("/conversations");
+  revalidatePath("/");
+  return { ok: true, message: `Marked ${outcome.replace("_", " ").toLowerCase()}.` };
+}
+
 /** Connect an offline simulated calendar so the booking loop runs without Cal.com. */
 export async function connectSimulationCalendarAction(): Promise<CalendarActionResult> {
   const ctx = await requireOrg();

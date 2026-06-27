@@ -376,3 +376,35 @@ a re-scrub before resuming. Tests 127 → 134.
 
 **P0 (§3 + §4) is complete.** Next: P1 — §6 booking quality (timezone/buffers +
 no-show reminders + lifecycle status) and §8 guarantee tracker.
+
+---
+
+## M13 — [P1] §6 Booking quality + no-show defense
+
+A "booked call" that's junk or a no-show triggers refunds — fatal on a fresh
+processor. M13 makes a booking mean a real, attendable meeting.
+
+- **Slot validation** (`lib/calendar/validate.ts`): timezone-aware business-hours
+  + weekend enforcement, configurable buffer, and **no double-booking** (overlap
+  against existing CONFIRMED/HELD/SHOWED calls, padded by the buffer). Not-in-the-
+  past + no-double-book apply from EVERY source; hours/buffer are enforced for
+  agent-proposed times (self-booked webhook/link slots were vetted by the provider).
+  Per-calendar config: `businessStartHour/EndHour`, `bufferMin`, `allowOutOfHours`.
+- **No-show defense** (`lib/agent/reminders.ts`): a confirmation email on booking,
+  then a 24h + 1h reminder sequence (each with a reschedule link), tracked via
+  `reminderCount`. A new **hourly cron** (`/api/jobs/reminders`) fires due reminders
+  and reconciles long-past confirmed calls to NO_SHOW. Reminders are transactional
+  (to someone who booked a call), so they bypass the marketing-compliance path.
+- **Lifecycle status:** `BookingStatus` gains SHOWED + RESCHEDULED;
+  `markBookingOutcomeAction` lets the operator record showed/no-show/rescheduled/
+  cancelled. A single `BOOKED_STATUSES` constant (`lib/booking-status.ts`) now
+  defines "a call was booked" for every KPI — so adding statuses can't silently
+  drop showed calls from the metrics.
+
+Acceptance met: booking respects timezone/business-hours/buffers and cannot
+double-book; every booking gets confirmation + reminders with reschedule; the
+lifecycle status is recorded and queryable. Tests 134 → 146.
+
+Note: business-hours config + booking-outcome controls have server actions +
+schema but minimal UI surfacing yet (the acceptance is data/behavior); a
+Conversations/Calls panel can expose them next.

@@ -18,7 +18,9 @@ describe("booking pipeline", () => {
     orgId = org.id;
     const other = await prisma.org.create({ data: { name: `Other ${tag}`, slug: `other-${tag}`, type: "CLIENT" } });
     otherOrgId = other.id;
-    await prisma.calendarConnection.create({ data: { orgId, provider: "SIMULATION", status: "CONNECTED", timezone: "UTC" } });
+    // allowOutOfHours so the pipeline/KPI assertions don't depend on which day
+    // the test happens to run; §6 hours enforcement is covered in validate.test.ts.
+    await prisma.calendarConnection.create({ data: { orgId, provider: "SIMULATION", status: "CONNECTED", timezone: "UTC", allowOutOfHours: true } });
     const mb = await prisma.mailbox.create({ data: { orgId, email: `m@${tag}.sim`, provider: "SIMULATION", status: "CONNECTED" } });
     mailboxId = mb.id;
   });
@@ -69,9 +71,11 @@ describe("booking pipeline", () => {
     await expect(bookCall({ orgId, leadId: lead.id, startsAt: new Date(Date.now() + 86_400_000) })).rejects.toBeInstanceOf(BookingError);
   });
 
-  it("refuses to double-book", async () => {
-    const lead = await prisma.lead.findFirstOrThrow({ where: { orgId, email: `win@${tag}.com` } });
-    await expect(bookCall({ orgId, leadId: lead.id, startsAt: new Date(Date.now() + 172_800_000) })).rejects.toBeInstanceOf(BookingError);
+  it("refuses to double-book a slot already taken by another lead (§6)", async () => {
+    // win@ already has a booking; a DIFFERENT lead at that exact slot must be refused.
+    const taken = await prisma.booking.findFirstOrThrow({ where: { orgId }, orderBy: { createdAt: "desc" } });
+    const other = await prisma.lead.create({ data: { orgId, email: `clash@${tag}.com`, firstName: "Clash", status: "NEGOTIATING" } });
+    await expect(bookCall({ orgId, leadId: other.id, startsAt: taken.startsAt })).rejects.toBeInstanceOf(BookingError);
   });
 
   it("KPIs aggregate recovered revenue + calls, isolated per org", async () => {

@@ -4,6 +4,9 @@ import { transition, canTransition } from "@/lib/agent/state-machine";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { notifyBooking } from "@/lib/notify";
 import { slotLabel } from "@/lib/calendar/slots";
+import { validateBookingSlot } from "@/lib/calendar/validate";
+import { sendBookingConfirmation } from "@/lib/agent/reminders";
+import { ACTIVE_SLOT_STATUSES } from "@/lib/booking-status";
 
 export class BookingError extends Error {
   constructor(message: string) {
@@ -65,6 +68,29 @@ export async function bookCall(opts: {
   const cal = await activeCalendar(orgId);
   const convo = await prisma.conversation.findUnique({ where: { leadId } });
 
+  // §6: validate the slot. No-double-book + not-in-the-past apply from EVERY
+  // source; business-hours/buffer are enforced for agent-proposed times (self-
+  // booked webhook/link slots were already vetted by the external provider).
+  const others = await prisma.booking.findMany({
+    where: { orgId, status: { in: ACTIVE_SLOT_STATUSES }, leadId: { not: leadId } },
+    select: { startsAt: true, endsAt: true },
+  });
+  const tz = cal?.timezone ?? "UTC";
+  const check = validateBookingSlot({
+    startsAt,
+    endsAt,
+    rules: {
+      timezone: tz,
+      businessStartHour: cal?.businessStartHour ?? 9,
+      businessEndHour: cal?.businessEndHour ?? 17,
+      bufferMin: cal?.bufferMin ?? 0,
+      allowOutOfHours: cal?.allowOutOfHours ?? false,
+    },
+    existing: others,
+    enforceHours: source === "agent",
+  });
+  if (!check.ok) throw new BookingError(`Can't book that slot — ${check.reason}.`);
+
   // Create the real event unless it came from a webhook (already created) or LINK.
   let providerEventId = opts.providerEventId;
   let meetingUrl = opts.meetingUrl ?? null;
@@ -95,6 +121,7 @@ export async function bookCall(opts: {
         providerEventId,
         source,
         valueCents: lead.dealValueCents,
+        timezone: tz,
       },
     });
 
@@ -114,9 +141,10 @@ export async function bookCall(opts: {
     return b;
   });
 
-  // Notify after commit (best-effort; never blocks the booking).
+  // Notify the operator + send the attendee a confirmation (both best-effort).
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email;
   await notifyBooking({ orgId, leadName: name, whenLabel: slotLabel(startsAt), meetingUrl });
+  await sendBookingConfirmation(booking.id).catch(() => {});
 
   return booking;
 }

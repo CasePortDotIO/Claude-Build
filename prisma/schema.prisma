@@ -684,6 +684,14 @@ model CalendarConnection {
   bookingLink String? // public booking URL (used by LINK + offered in copy)
   timezone    String  @default("UTC")
 
+  // §6 booking quality: business-hours window (in `timezone`), buffer between
+  // calls, and whether off-hours/weekend bookings are allowed at all.
+  businessStartHour Int     @default(9) // 0–23, inclusive
+  businessEndHour   Int     @default(17) // 0–23, exclusive (last start < this)
+  bufferMin         Int     @default(0)
+  allowOutOfHours   Boolean @default(false)
+  slotDurationMin   Int     @default(30)
+
   bookings Booking[]
 
   createdAt DateTime @default(now())
@@ -694,9 +702,11 @@ model CalendarConnection {
 
 enum BookingStatus {
   HELD // tentative hold
-  CONFIRMED // the call is on the calendar
+  CONFIRMED // booked — the call is on the calendar
+  SHOWED // the lead attended (success)
+  NO_SHOW // booked but didn't attend
+  RESCHEDULED // moved to a new time
   CANCELED
-  NO_SHOW
 }
 
 // A booked call — the terminal success of the agent loop.
@@ -723,10 +733,17 @@ model Booking {
   // Snapshot of the lead's value at booking time → recovered-revenue KPI.
   valueCents Int @default(0)
 
+  // §6 no-show defense: timezone snapshot + reminder accounting. reminderCount
+  // tracks which timed reminders have fired (0=none, 1=24h, 2=1h).
+  timezone      String?
+  reminderCount Int       @default(0)
+  lastReminderAt DateTime?
+
   createdAt DateTime @default(now())
 
   @@index([orgId, createdAt])
   @@index([leadId])
+  @@index([orgId, status, startsAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

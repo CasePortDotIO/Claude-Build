@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { cohortStats, abLift } from "@/lib/agent/rollups";
+import { BOOKED_STATUSES } from "@/lib/booking-status";
 
 /**
  * Retention engine (M10). The moat for this product is an agent that compounds
@@ -103,8 +104,8 @@ export interface RoiLedger {
 
 export async function roiLedger(orgId: string): Promise<RoiLedger> {
   const [revenue, callsBooked, reactivated, org] = await Promise.all([
-    prisma.booking.aggregate({ where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } }, _sum: { valueCents: true } }),
-    prisma.booking.count({ where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } } }),
+    prisma.booking.aggregate({ where: { orgId, status: { in: BOOKED_STATUSES } }, _sum: { valueCents: true } }),
+    prisma.booking.count({ where: { orgId, status: { in: BOOKED_STATUSES } } }),
     // A lead is "reactivated" once it replies for real (the agent woke it up).
     prisma.message.findMany({
       where: { orgId, direction: "INBOUND", isAutoReply: false, isBounce: false },
@@ -145,10 +146,10 @@ export async function dailyBrief(orgId: string, windowHours = 24): Promise<Daily
   const [drafted, replied, bookings, pendingApprovals, latestInsight, cumulative] = await Promise.all([
     prisma.agentRun.count({ where: { orgId, step: "DRAFT", createdAt: { gte: since } } }),
     prisma.message.count({ where: { orgId, direction: "INBOUND", isAutoReply: false, isBounce: false, createdAt: { gte: since } } }),
-    prisma.booking.findMany({ where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] }, createdAt: { gte: since } }, select: { valueCents: true } }),
+    prisma.booking.findMany({ where: { orgId, status: { in: BOOKED_STATUSES }, createdAt: { gte: since } }, select: { valueCents: true } }),
     prisma.draft.count({ where: { orgId, status: "PENDING_APPROVAL" } }),
     prisma.insight.findFirst({ where: { orgId, status: "APPLIED" }, orderBy: { appliedAt: "desc" }, select: { title: true, body: true } }),
-    prisma.booking.aggregate({ where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } }, _sum: { valueCents: true } }),
+    prisma.booking.aggregate({ where: { orgId, status: { in: BOOKED_STATUSES } }, _sum: { valueCents: true } }),
   ]);
 
   const booked = bookings.length;
