@@ -65,6 +65,7 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [switching, startSwitch] = useTransition();
 
   function switchTo(orgId: string) {
@@ -87,7 +88,21 @@ export function Sidebar({
     .toUpperCase();
 
   return (
-    <aside className="ws-scroll sticky top-0 flex h-screen w-[248px] flex-none flex-col overflow-y-auto bg-charcoal">
+    <>
+      {/* Mobile hamburger — opens the drawer (hidden on lg+). */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open menu"
+        className="fixed left-3 top-3 z-50 flex h-10 w-10 items-center justify-center rounded-lg bg-charcoal text-white shadow-lg lg:hidden"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+      </button>
+      {/* Backdrop when the drawer is open on mobile. */}
+      {mobileOpen && <div onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-black/50 lg:hidden" />}
+
+      <aside
+        className={`ws-scroll fixed inset-y-0 left-0 z-50 flex h-screen w-[248px] flex-none flex-col overflow-y-auto bg-charcoal transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
       <div className="relative border-b border-charcoal-line px-[22px] pb-[18px] pt-6">
         <p className="m-0 mb-[3px] font-heading text-[15px] font-semibold tracking-[-0.2px]" style={{ color: branding.color }}>
           {branding.tagline}
@@ -135,6 +150,7 @@ export function Sidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
                 active ? "bg-charcoal-soft text-white" : "text-on-dark-soft hover:bg-[#1d2125] hover:text-white"
               }`}
@@ -178,6 +194,7 @@ export function Sidebar({
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -7,8 +7,8 @@ import Link from "next/link";
  */
 export function Topbar({ title }: { title: string }) {
   return (
-    <header className="sticky top-0 z-40 flex h-[66px] items-center justify-between gap-5 border-b border-[#e7e1d6] bg-[rgba(250,247,242,0.86)] px-[34px] backdrop-blur-md">
-      <h1 className="m-0 font-heading text-[20px] font-semibold tracking-[-0.3px] text-ink">{title}</h1>
+    <header className="sticky top-0 z-30 flex h-[66px] items-center justify-between gap-3 border-b border-[#e7e1d6] bg-[rgba(250,247,242,0.86)] px-4 pl-16 backdrop-blur-md sm:gap-5 lg:px-[34px]">
+      <h1 className="m-0 truncate font-heading text-[18px] font-semibold tracking-[-0.3px] text-ink sm:text-[20px]">{title}</h1>
       <div className="flex items-center gap-3.5">
         <span className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-[12.5px]">
           <span className="inline-block h-2 w-2 animate-wsPulse rounded-full bg-sweep" />
