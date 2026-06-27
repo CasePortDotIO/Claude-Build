@@ -6,6 +6,8 @@ import { VoiceProfileCard, type VoiceVM } from "@/components/agent/VoiceProfileC
 import { SelfImprovement, type InsightVM, type AbVM } from "@/components/agent/SelfImprovement";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
 import { cohortStats, abLift } from "@/lib/agent/rollups";
+import { agentMaturity, roiLedger } from "@/lib/retention";
+import { AgentMaturityCard } from "@/components/magic/AgentMaturity";
 import { timeAgo } from "@/lib/format";
 
 const STEP_LABEL: Record<string, string> = {
@@ -30,6 +32,9 @@ export default async function AgentPage() {
     prisma.orgLearning.findUnique({ where: { orgId: ctx.orgId } }),
     cohortStats(ctx.orgId),
   ]);
+
+  // M10: switching-cost made legible — the trained-agent score + ROI ledger.
+  const [maturity, ledger] = await Promise.all([agentMaturity(ctx.orgId), roiLedger(ctx.orgId)]);
 
   const insightVMs: InsightVM[] = insights.map((i) => ({
     id: i.id,
@@ -72,6 +77,9 @@ export default async function AgentPage() {
     <>
       <Topbar title="The Agent" />
       <div className="ws-rise max-w-[1000px] flex-1 px-[34px] pb-[60px] pt-[30px]">
+        {/* M10: trained-agent maturity score + ROI ledger — the switching cost */}
+        <AgentMaturityCard maturity={maturity} ledger={ledger} />
+
         {/* identity */}
         <div className="mb-[18px] flex flex-wrap items-center gap-[22px] rounded-xl2 bg-charcoal p-8">
           <div className="flex h-16 w-16 flex-none items-center justify-center rounded-2xl bg-[rgba(92,169,138,0.14)]">

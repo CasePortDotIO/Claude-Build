@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runReflection } from "@/lib/agent/reflection";
 import { reengagementSweep } from "@/lib/agent/maintenance";
+import { dailyBrief } from "@/lib/retention";
+import { notifyMorningBrief } from "@/lib/notify";
 
 /**
  * Nightly reflection job (§8). In production this is invoked on a schedule —
@@ -26,14 +28,19 @@ async function runJob(req: NextRequest) {
   const orgs = await prisma.org.findMany({ where: { type: "CLIENT" }, select: { id: true } });
   let totalInsights = 0;
   let totalCooled = 0;
+  let briefsPushed = 0;
   for (const org of orgs) {
     const res = await runReflection(org.id);
     totalInsights += res.created;
     // Follow-up branch: cool leads that went silent past the learned gap.
     const sweep = await reengagementSweep(org.id);
     totalCooled += sweep.cooled;
+    // M10: push the overnight Morning Brief to Slack — the habit-loop trigger.
+    const brief = await dailyBrief(org.id);
+    const sent = await notifyMorningBrief(org.id, brief);
+    if (sent.slack) briefsPushed++;
   }
-  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled });
+  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed });
 }
 
 // Vercel Cron uses GET; external schedulers may POST. Both require the secret.

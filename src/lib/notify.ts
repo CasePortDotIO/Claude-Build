@@ -1,5 +1,41 @@
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
+import { formatMoney } from "@/lib/format";
+import type { DailyBrief } from "@/lib/retention";
+
+/** Post raw text to the org's Slack webhook if one is configured. Best-effort. */
+async function postSlack(orgId: string, text: string): Promise<boolean> {
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { slackWebhookEnc: true } });
+  if (!org?.slackWebhookEnc) return false;
+  try {
+    const url = decryptSecret(org.slackWebhookEnc);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The Morning Brief, pushed to Slack by the nightly job (M10). This is the
+ * external trigger of the habit loop — it pulls the operator back in each day
+ * with the overnight story. Skips silently on quiet nights so it never nags.
+ */
+export async function notifyMorningBrief(orgId: string, brief: DailyBrief): Promise<{ slack: boolean }> {
+  if (!brief.hasActivity) return { slack: false };
+  const lines = [
+    `☀️ *Your Warm Sweep — overnight brief*`,
+    `• ${brief.drafted} drafted · ${brief.replied} replied · ${brief.booked} booked`,
+  ];
+  if (brief.recoveredCents > 0) lines.push(`• ${formatMoney(brief.recoveredCents)} reactivated (${formatMoney(brief.cumulativeRecoveredCents)} all-time)`);
+  if (brief.latestInsight) lines.push(`• 🧠 It learned: ${brief.latestInsight.body}`);
+  if (brief.pendingApprovals > 0) lines.push(`• ✍️ ${brief.pendingApprovals} draft${brief.pendingApprovals === 1 ? "" : "s"} need your nod`);
+  return { slack: await postSlack(orgId, lines.join("\n")) };
+}
 
 /**
  * Notifications (§6): ping the operator when a call books. Slack webhook if the

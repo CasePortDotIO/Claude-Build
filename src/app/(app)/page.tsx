@@ -6,20 +6,24 @@ import { commandCenterKpis, reactivationsChart, activityFeed, firstRunState, lat
 import { formatMoney, timeAgo } from "@/lib/format";
 import { FirstRunGuide } from "@/components/magic/FirstRunGuide";
 import { BookingCelebration } from "@/components/magic/BookingCelebration";
+import { MorningBrief } from "@/components/magic/MorningBrief";
+import { dailyBrief } from "@/lib/retention";
 
 // Command Center — real data (M4). KPI row, reactivations chart, live activity
 // feed, and the latest agent action. The "agent updated itself" self-improvement
 // card (with metric-justified changes) is M6; here we surface the latest real run.
 export default async function CommandCenter() {
   const ctx = await requireOrg();
-  const [kpis, chart, activity, latestInsight, firstRun, recentBooking] = await Promise.all([
+  const [kpis, chart, activity, latestInsight, firstRun, recentBooking, brief] = await Promise.all([
     commandCenterKpis(ctx.orgId),
     reactivationsChart(ctx.orgId),
     activityFeed(ctx.orgId),
     prisma.insight.findFirst({ where: { orgId: ctx.orgId, status: "APPLIED" }, orderBy: { appliedAt: "desc" } }),
     firstRunState(ctx.orgId),
     latestBooking(ctx.orgId),
+    dailyBrief(ctx.orgId),
   ]);
+  const today = new Date().toISOString().slice(0, 10); // per-day collapse key for the brief
 
   const maxBar = Math.max(1, ...chart.map((b) => b.value));
   // Celebrate a booking only while it's fresh (< 48h); the component remembers dismissal.
@@ -45,6 +49,9 @@ export default async function CommandCenter() {
 
         {/* M9: guided first sweep — shown until they take one lead all the way to a send */}
         {!firstRun.complete && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
+
+        {/* M10: the daily habit loop — what the agent did overnight */}
+        {firstRun.complete && <MorningBrief brief={brief} dateKey={today} />}
 
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">

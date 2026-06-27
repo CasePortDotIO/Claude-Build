@@ -238,3 +238,37 @@ while fresh (< 48h).
 Tests grew 97 → 105 (voice-match scoring + echo detection, dormant-value
 stamping at ingest, voice-match persistence, first-run progress). Build clean,
 all 105 green. Verified live with browser screenshots of every surface.
+
+---
+
+## M10 — Retention: switching cost, habit loop, ROI ledger
+
+Churn is beaten by *accrued value the customer can see and would lose*, not by
+lock-in. M10 surfaces the compounding assets the agent already builds. No new
+schema — every input already accrues. (`lib/retention.ts`, pure org-scoped reads.)
+
+### 1 · Agent Maturity score (`AgentMaturityCard`, The Agent page)
+A 0–100 "trained" score with a conic ring + component bars: voice trained,
+lead memory, self-improvement (insights applied × learning version), sender
+reputation (days warmed), measured A/B lift. The number climbs only with use, so
+it *is* the thing a coach resets to zero by leaving — switching cost made legible.
+
+### 2 · ROI ledger (under the maturity card)
+Cumulative recovered revenue, run-rate ($/mo), leads reactivated, days on the
+job. The number that only grows; turning it off *feels* like loss.
+
+### 3 · Morning Brief (`MorningBrief`, Command Center + Slack)
+The habit loop. The nightly reflection run already produces the material; the
+brief surfaces it as the first thing the operator sees each morning — drafted /
+replied / booked, pipeline reactivated, what it learned, what needs their nod.
+Collapses once per calendar day (greets, never nags). The nightly cron also
+**pushes it to Slack** (`notifyMorningBrief`) — the external trigger that pulls
+them back in daily. Hook model: trigger → one-click approve → variable reward
+(who replied/booked) → investment (each approval makes tomorrow's agent better).
+
+### Deliberately NOT done (anti-patterns)
+No cancellation friction, export throttling, or guilt walls — off-brand for a
+GDPR-respecting product and they raise gross churn. The moat is value, not walls.
+
+Tests 105 → 109 (maturity scoring climbs with training, ledger sums confirmed
+bookings, brief windows + pending). Build clean; both surfaces verified live.
