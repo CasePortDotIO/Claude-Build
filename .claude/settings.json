@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "auto",
     "allow": [
       "mcp__Vercel__list_teams",
       "mcp__Vercel__list_projects",
