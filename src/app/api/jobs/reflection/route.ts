@@ -12,9 +12,11 @@ import { reengagementSweep } from "@/lib/agent/maintenance";
  *
  *   Vercel cron example (vercel.json):
  *     { "crons": [{ "path": "/api/jobs/reflection", "schedule": "0 7 * * *" }] }
- *   with CRON_SECRET set and sent as Authorization: Bearer <secret>.
+ *   Vercel Cron invokes the path with GET and auto-attaches
+ *   Authorization: Bearer <CRON_SECRET> when CRON_SECRET is set in the project,
+ *   so both verbs are handled. External schedulers can POST with the same header.
  */
-export async function POST(req: NextRequest) {
+async function runJob(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const auth = req.headers.get("authorization");
@@ -33,3 +35,7 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled });
 }
+
+// Vercel Cron uses GET; external schedulers may POST. Both require the secret.
+export const GET = runJob;
+export const POST = runJob;
