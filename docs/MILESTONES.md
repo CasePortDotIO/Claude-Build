@@ -497,3 +497,5 @@ All sections shipped, enforced in code, and tested:
 - **§1 non-negotiables:** per-customer isolation, email-only, model-agnostic, no AI persona — all held.
 
 The §12 end-to-end flow is live and tested. 160 tests; clean build.
+
+<!-- deploy: env vars set on Preview; triggering Vercel build -->
