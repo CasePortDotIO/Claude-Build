@@ -16,6 +16,8 @@ export interface VariantVM {
   body: string;
   confidence: number;
   rationale: string;
+  voiceMatch: number | null;
+  voiceEcho: string | null;
 }
 export interface DraftVM {
   id: string;
@@ -177,6 +179,21 @@ function DraftEditor({
       </div>
 
       <p className="m-0 mb-3 text-[12px] italic text-muted-2">{variant.rationale}</p>
+
+      {/* M9: voice fidelity — show, don't tell, that this sounds like them */}
+      {variant.voiceMatch != null && (
+        <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-lg border border-[rgba(27,122,87,0.18)] bg-sweep-mist px-3.5 py-2.5">
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-sweep">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+            {Math.round(variant.voiceMatch * 100)}% match to your voice
+          </span>
+          {variant.voiceEcho && (
+            <span className="text-[12px] text-ink-soft">
+              · echoes your own words: <span className="italic text-sweep">&ldquo;{variant.voiceEcho}&rdquo;</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* editable email */}
       <label className="mb-1.5 block text-[12px] font-semibold text-ink">Subject</label>

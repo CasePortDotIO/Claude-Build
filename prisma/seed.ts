@@ -28,7 +28,7 @@ async function main() {
   // --- Client org A: Monroe Coaching (white-labeled) ---
   const monroe = await prisma.org.upsert({
     where: { slug: "monroe-coaching" },
-    update: { brandName: "Monroe Coaching", brandColor: "#1B7A57", clientPriceCents: 49700, billingStatus: "active" },
+    update: { brandName: "Monroe Coaching", brandColor: "#1B7A57", clientPriceCents: 49700, billingStatus: "active", avgClientValueCents: 300000 },
     create: {
       name: "Monroe Coaching",
       slug: "monroe-coaching",
@@ -39,13 +39,14 @@ async function main() {
       brandColor: "#1B7A57",
       clientPriceCents: 49700,
       billingStatus: "active",
+      avgClientValueCents: 300000,
     },
   });
 
   // --- Client org B: Apex Fitness (own brand; proves isolation from Monroe) ---
   const apex = await prisma.org.upsert({
     where: { slug: "apex-fitness" },
-    update: { brandName: "Apex Fitness Studio", brandColor: "#E8743B", clientPriceCents: 39700, billingStatus: "active" },
+    update: { brandName: "Apex Fitness Studio", brandColor: "#E8743B", clientPriceCents: 39700, billingStatus: "active", avgClientValueCents: 240000 },
     create: {
       name: "Apex Fitness Studio",
       slug: "apex-fitness",
@@ -56,6 +57,7 @@ async function main() {
       brandColor: "#E8743B",
       clientPriceCents: 39700,
       billingStatus: "active",
+      avgClientValueCents: 240000,
     },
   });
 

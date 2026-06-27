@@ -49,6 +49,8 @@ export default async function ApprovalsPage() {
       body: v.body,
       confidence: v.confidence,
       rationale: v.rationale,
+      voiceMatch: v.voiceMatch,
+      voiceEcho: v.voiceEcho,
     })),
   }));
 

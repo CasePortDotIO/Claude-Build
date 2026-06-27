@@ -2,27 +2,50 @@ import Link from "next/link";
 import { requireOrg } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { Topbar } from "@/components/nav/Topbar";
-import { commandCenterKpis, reactivationsChart, activityFeed } from "@/lib/metrics";
+import { commandCenterKpis, reactivationsChart, activityFeed, firstRunState, latestBooking } from "@/lib/metrics";
 import { formatMoney, timeAgo } from "@/lib/format";
+import { FirstRunGuide } from "@/components/magic/FirstRunGuide";
+import { BookingCelebration } from "@/components/magic/BookingCelebration";
 
 // Command Center — real data (M4). KPI row, reactivations chart, live activity
 // feed, and the latest agent action. The "agent updated itself" self-improvement
 // card (with metric-justified changes) is M6; here we surface the latest real run.
 export default async function CommandCenter() {
   const ctx = await requireOrg();
-  const [kpis, chart, activity, latestInsight] = await Promise.all([
+  const [kpis, chart, activity, latestInsight, firstRun, recentBooking] = await Promise.all([
     commandCenterKpis(ctx.orgId),
     reactivationsChart(ctx.orgId),
     activityFeed(ctx.orgId),
     prisma.insight.findFirst({ where: { orgId: ctx.orgId, status: "APPLIED" }, orderBy: { appliedAt: "desc" } }),
+    firstRunState(ctx.orgId),
+    latestBooking(ctx.orgId),
   ]);
 
   const maxBar = Math.max(1, ...chart.map((b) => b.value));
+  // Celebrate a booking only while it's fresh (< 48h); the component remembers dismissal.
+  const celebrate =
+    recentBooking && Date.now() - recentBooking.bookedAt.getTime() < 48 * 3600 * 1000 ? recentBooking : null;
 
   return (
     <>
       <Topbar title="Command Center" />
       <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
+        {/* M9: the payoff moment — a fresh booking lands loud */}
+        {celebrate && (
+          <BookingCelebration
+            booking={{
+              id: celebrate.id,
+              name: celebrate.name,
+              valueCents: celebrate.valueCents,
+              bookedAt: celebrate.bookedAt.toISOString(),
+              coldFor: celebrate.coldFor,
+            }}
+          />
+        )}
+
+        {/* M9: guided first sweep — shown until they take one lead all the way to a send */}
+        {!firstRun.complete && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
+
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">
           <div className="relative overflow-hidden rounded-xl2 bg-sweep p-[22px] text-white">

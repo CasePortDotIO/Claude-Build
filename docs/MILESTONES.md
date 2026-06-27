@@ -189,3 +189,52 @@ sweep + best-hour timing, promoted-opener bias).
 - Guardrail "no invented facts" is prompt-enforced on the live-Claude path (the
   stub is fact-safe by construction) plus the human approval gate; there's no
   programmatic post-generation fact-checker yet.
+
+---
+
+## M9 — "The Magic": perceived value & the first-run wow
+
+Top-0.01% isn't more backend — it's the first 60 seconds and the emotional
+payoff. M9 makes the latent value *felt*, not assembled. Five surfaces, all
+grounded in real data, all behind the existing guardrails.
+
+### Schema (`m9_magic_dormant_value_voice_match`)
+- `Org.avgClientValueCents` — what one client is worth; set once in the first
+  sweep, remembered. Stamps every imported lead's `dealValueCents` at ingest so
+  the dormant pipeline + recovered-revenue KPI are real, not decorative.
+- `DraftVariant.voiceMatch` (0..1) + `voiceEcho` — voice fidelity made visible.
+
+### 1 · Dormant-money reveal (`ImportWizard` done step)
+The import wizard now asks "what's a client worth to you?" (optional). On import
+it shows the wow: **"You just reconnected with N prior contacts sitting on
+$X in dormant pipeline"** (animated count-up) + a conservative *"~$Y recoverable
+at just a 5% reactivation rate"*. CTA flips from "View leads" to "Draft the
+first emails →". Honest accounting stats (imported / dup / suppressed / bad)
+sit below. `dormantPipelineCents = imported × avgClientValueCents`.
+
+### 2 · Voice fidelity, shown not told (`lib/agent/voice-match.ts`)
+Deterministic scorer (no extra LLM call): blends the model's confidence with
+structural alignment to the learned voice (greeting / sign-off / sentence-length,
+placeholder-aware) and a real **≥4-word phrase echoed from the operator's own
+past emails**. Surfaced at approval: *"94% match to your voice · echoes your own
+words: '…'"*. Computed in `draft.ts`, persisted per variant.
+
+### 3 · Guided first sweep (`FirstRunGuide` on Command Center)
+A brand-new coach gets a 4-step checklist (connect → import → draft → approve)
+that lights up green from real data and always points at the next click —
+instead of an empty dashboard. Hides itself once they've taken one lead all the
+way to a send (`firstRunState`).
+
+### 4 · Booking celebration (`BookingCelebration`)
+When a cold lead books, the Command Center leads with the payoff:
+**"🎉 {name} just booked a call — ${value} reactivated · from a lead that had
+gone quiet for {N}d."** Shows once per booking (localStorage dismiss), only
+while fresh (< 48h).
+
+### 5 · Trust as confidence, early (`TrustStrip`)
+"Nothing sends without you · keys never touch the browser · prior contacts only"
+— surfaced on the import wizard and the first-run guide, where the fear lives.
+
+Tests grew 97 → 105 (voice-match scoring + echo detection, dormant-value
+stamping at ingest, voice-match persistence, first-run progress). Build clean,
+all 105 green. Verified live with browser screenshots of every surface.

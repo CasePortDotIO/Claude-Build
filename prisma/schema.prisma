@@ -56,6 +56,11 @@ model Org {
   seats            Int    @default(1)
   billingStatus    String @default("active") // active | trial | past_due | paused
 
+  // M9: what one client is worth to this coach. Set once during the first sweep;
+  // stamps each imported lead's dealValueCents and powers the "dormant pipeline"
+  // reveal + recovered-revenue math. 0 until the operator tells us.
+  avgClientValueCents Int @default(0)
+
   // CAN-SPAM: a real physical mailing address shown in every email (enforced M5).
   mailingAddress String?
 
@@ -413,6 +418,12 @@ model DraftVariant {
   openingLine String // first line — tracked for self-improvement analytics (M6)
   confidence  Float  @default(0)
   rationale   String @db.Text
+
+  // M9: how closely this variant tracks the operator's learned voice (0..1) and
+  // a real phrase it echoes from their own past emails — surfaced at approval so
+  // the coach can SEE it sounds like them, not just be told.
+  voiceMatch Float?
+  voiceEcho  String?
 
   createdAt DateTime @default(now())
 

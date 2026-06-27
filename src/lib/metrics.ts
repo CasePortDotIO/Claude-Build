@@ -33,6 +33,61 @@ export async function commandCenterKpis(orgId: string): Promise<CommandCenterKpi
   };
 }
 
+// M9: first-run progress. Drives the guided "first sweep" checklist on the
+// Command Center until the operator has taken a lead all the way to a send.
+export interface FirstRunState {
+  mailboxConnected: boolean;
+  leadsImported: boolean;
+  draftsGenerated: boolean;
+  firstSent: boolean;
+  complete: boolean; // all four done — hide the guide
+  leadCount: number;
+}
+
+export async function firstRunState(orgId: string): Promise<FirstRunState> {
+  const [mailbox, leadCount, draftCount, sentCount] = await Promise.all([
+    prisma.mailbox.count({ where: { orgId, status: "CONNECTED" } }),
+    prisma.lead.count({ where: { orgId } }),
+    prisma.draft.count({ where: { orgId } }),
+    prisma.message.count({ where: { orgId, direction: "OUTBOUND" } }),
+  ]);
+  const mailboxConnected = mailbox > 0;
+  const leadsImported = leadCount > 0;
+  const draftsGenerated = draftCount > 0;
+  const firstSent = sentCount > 0;
+  return {
+    mailboxConnected,
+    leadsImported,
+    draftsGenerated,
+    firstSent,
+    complete: mailboxConnected && leadsImported && draftsGenerated && firstSent,
+    leadCount,
+  };
+}
+
+// M9: the most recent booking, for the "you just recovered $X" celebration.
+export interface LatestBooking {
+  id: string;
+  name: string;
+  valueCents: number;
+  bookedAt: Date;
+  coldFor: string | null; // how long the lead had been dormant before booking
+}
+
+export async function latestBooking(orgId: string): Promise<LatestBooking | null> {
+  const b = await prisma.booking.findFirst({
+    where: { orgId, status: { in: ["CONFIRMED", "NO_SHOW"] } },
+    orderBy: { createdAt: "desc" },
+    include: { lead: { select: { firstName: true, lastName: true, email: true, createdAt: true } } },
+  });
+  if (!b) return null;
+  const name = [b.lead.firstName, b.lead.lastName].filter(Boolean).join(" ") || b.lead.email;
+  const coldMs = b.createdAt.getTime() - b.lead.createdAt.getTime();
+  const coldDays = Math.floor(coldMs / 86_400_000);
+  const coldFor = coldDays >= 1 ? (coldDays >= 30 ? `${Math.floor(coldDays / 30)}mo` : `${coldDays}d`) : null;
+  return { id: b.id, name, valueCents: b.valueCents, bookedAt: b.createdAt, coldFor };
+}
+
 // 7-day reactivations chart: bookings per day (most recent last).
 export interface ChartBar {
   day: string;

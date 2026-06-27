@@ -3,6 +3,7 @@ import { getLLMProvider } from "@/lib/ai/provider";
 import { retrieveSimilar } from "@/lib/memory";
 import { estimateCostUsd } from "@/lib/ai/config";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
+import { computeVoiceFidelity } from "@/lib/agent/voice-match";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { assignCohort } from "@/lib/agent/rollups";
 import type { DraftInput, VoiceProfileShape } from "@/lib/ai/types";
@@ -108,6 +109,13 @@ export async function generateDraftsForLead(opts: {
   const provider = getLLMProvider();
   const result = await provider.draftReengagement(input);
 
+  // M9: score each variant's voice fidelity against the operator's own past
+  // emails — deterministic, no extra model call — so approval can show the proof.
+  const sampleTexts = voiceSamples.map((m) => m.content);
+  const fidelity = result.variants.map((v) =>
+    computeVoiceFidelity({ body: v.body, voice, voiceSamples: sampleTexts, confidence: v.confidence }),
+  );
+
   // Act: persist the audit run, supersede old drafts, create the new draft.
   const draft = await prisma.$transaction(async (tx) => {
     const run = await tx.agentRun.create({
@@ -151,6 +159,8 @@ export async function generateDraftsForLead(opts: {
             openingLine: v.openingLine,
             confidence: v.confidence,
             rationale: v.rationale,
+            voiceMatch: fidelity[i]?.match ?? null,
+            voiceEcho: fidelity[i]?.echo ?? null,
           })),
         },
       },

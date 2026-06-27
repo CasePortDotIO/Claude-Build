@@ -60,6 +60,12 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
   const suppressed = leads.filter((l) => suppressedSet.has(l.email)).length;
   const totalRows = opts.totalRows ?? leads.length;
 
+  // M9: stamp each lead with the operator's average client value so the dormant
+  // pipeline is real and the recovered-revenue KPI has something to count when
+  // a lead eventually books. 0 (the default) simply means "not told yet".
+  const org = await prisma.org.findUnique({ where: { id: opts.orgId }, select: { avgClientValueCents: true } });
+  const dealValueCents = org?.avgClientValueCents ?? 0;
+
   // (3) Persist atomically.
   const record = await prisma.$transaction(async (tx) => {
     const batch = await tx.leadImport.create({
@@ -93,6 +99,7 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
           originalInquiry: l.originalInquiry,
           statedGoal: l.statedGoal,
           region: l.region,
+          dealValueCents,
         })),
         skipDuplicates: true,
       });

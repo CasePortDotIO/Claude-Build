@@ -24,6 +24,9 @@ export const importRequestSchema = z.object({
   consentBasis: z
     .enum(["PRIOR_INQUIRY", "EXISTING_CUSTOMER", "EXPLICIT_CONSENT", "LEGITIMATE_INTEREST", "UNKNOWN"])
     .default("PRIOR_INQUIRY"),
+  // M9: what one client is worth (whole dollars, from the wizard). Stamps each
+  // lead's value + powers the dormant-pipeline reveal. Capped to keep the math sane.
+  avgClientValueDollars: z.number().int().min(0).max(1_000_000).optional(),
 });
 
 export type ImportRequest = z.infer<typeof importRequestSchema>;
