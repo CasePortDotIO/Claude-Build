@@ -433,3 +433,30 @@ measurable in-product, per customer, on a rolling window.
 Acceptance met: X defined once and referenced everywhere; the dashboard reports
 booked-calls-in-trailing-30-days and whether the bar is met; value is real-data
 derived. Tests 146 → 149.
+
+---
+
+## M15 — [P1] §5 Reply confidence gate + conservative qualification
+
+The category's most common 2–3 star tag is the AI getting "confidently wrong"
+off-script. Replies already routed to human approval (nothing auto-sends); M15
+adds the judgement layer so the *drafted* reply is never a confident guess.
+
+- **`classifyReplyIntent`** (`lib/agent/reply-intent.ts`): deterministic (no LLM,
+  so it can't itself hallucinate) classification of every inbound reply →
+  intent + confidence + `needsHuman` + reason. Routes to a human on hostile/
+  complaint language, ambiguous 1–2-word replies, and **questions it can't verify**
+  (price, terms, refund, exact logistics) — the agent must never fabricate those.
+- **Holding reply:** when `needsHuman`, `draftReply` produces a safe, non-committal
+  note that promises a personal follow-up instead of an answer (new `holdForReview`
+  flag on `ReplyDraftInput`; the stub guarantees no fabricated price/commitment).
+- **Conservative qualification:** a soft "no/not now" is explicitly NOT a hard
+  disqualification — the gate keeps nurturing rather than closing the lead, and
+  logs the reason.
+- **Surfaced to the operator:** `Conversation.reviewReason` drives a "Flagged for
+  you: …" banner in Conversations so the human knows exactly why a thread needs
+  their eyes.
+
+Acceptance met: off-script/ambiguous replies trigger the gate (held reply +
+flag) instead of a confident wrong answer; qualification is conservative and
+reasoned; no AI self-disclosure in any lead-facing copy. Tests 149 → 155.

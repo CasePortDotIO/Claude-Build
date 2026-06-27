@@ -218,6 +218,36 @@ export class StubProvider implements LLMProvider {
     const greeting = voice.greeting.replace(/\{\{\s*firstName\s*\}\}/g, lead.firstName || "there");
     const signOff = voice.signOff.replace(/\{\{\s*operator\s*\}\}/g, operatorName);
 
+    // §5 confidence gate: off-script / unverifiable / hostile → a safe holding
+    // note that defers to the human. The agent NEVER fabricates an answer here.
+    if (input.holdForReview) {
+      const body = [
+        greeting,
+        ``,
+        `Thanks for getting back to me — good question. Let me make sure I get you the right answer rather than guess, so I'll follow up personally on this shortly.`,
+        ``,
+        signOff,
+        ``,
+        optOutLine,
+      ].join("\n");
+      return {
+        variants: [
+          {
+            angle: "holding",
+            subject: "Re: let me get back to you on that",
+            body,
+            openingLine: "Thanks for getting back to me — good question.",
+            confidence: 0.5,
+            rationale: "Off-script/unverifiable — holds with a safe, human reply instead of guessing (routed for your review).",
+          },
+        ],
+        overallRationale: "Confidence gate: the reply needs a human. Drafted a non-committal holding note that promises a personal follow-up.",
+        usage: estimateUsage(buildReplyUserPrompt(input), body),
+        provider: this.name,
+        model: this.model,
+      };
+    }
+
     const offer = availability.length
       ? `I've got ${availability.slice(0, 2).join(" or ")} open — would either work?`
       : `I could do tomorrow afternoon or Thursday morning — would either of those work for a quick 15 minutes?`;

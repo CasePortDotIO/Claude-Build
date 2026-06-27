@@ -8,6 +8,7 @@ import { transition, canTransition } from "@/lib/agent/state-machine";
 import { availabilityLabels } from "@/lib/agent/booking";
 import { storeMemory } from "@/lib/memory";
 import { autoPauseDecision } from "@/lib/compliance/caps";
+import { classifyReplyIntent } from "@/lib/agent/reply-intent";
 import type { ThreadTurn, VoiceProfileShape } from "@/lib/ai/types";
 
 export interface IngestResult {
@@ -107,11 +108,20 @@ export async function ingestInboundEmail(opts: {
   // Memory: the lead's own words are valuable signal.
   await storeMemory({ orgId, kind: "LEAD_REPLY", content: email.body, leadId: lead.id });
 
-  const replyDraftId = await draftReplyForApproval({ orgId, leadId: lead.id, conversationId: conversation.id, theirReply: email.body });
+  // §5 confidence gate: read the reply's intent before drafting. Off-script,
+  // ambiguous, hostile, or unverifiable → hold with a safe reply + flag why.
+  const assessment = classifyReplyIntent(email.body);
+  const replyDraftId = await draftReplyForApproval({
+    orgId,
+    leadId: lead.id,
+    conversationId: conversation.id,
+    theirReply: email.body,
+    holdForReview: assessment.needsHuman,
+  });
 
   await prisma.conversation.update({
     where: { id: conversation.id },
-    data: { lastInboundAt: email.receivedAt, status: "NEEDS_REVIEW" },
+    data: { lastInboundAt: email.receivedAt, status: "NEEDS_REVIEW", reviewReason: assessment.needsHuman ? assessment.reason : null },
   });
 
   return { outcome: "reply", leadId: lead.id, conversationId: conversation.id, replyDraftId };
@@ -123,9 +133,10 @@ async function draftReplyForApproval(opts: {
   leadId: string;
   conversationId: string;
   theirReply: string;
+  holdForReview?: boolean;
 }): Promise<string> {
   const start = Date.now();
-  const { orgId, leadId, conversationId, theirReply } = opts;
+  const { orgId, leadId, conversationId, theirReply, holdForReview } = opts;
 
   const [lead, org, profile, history, availability] = await Promise.all([
     prisma.lead.findUniqueOrThrow({ where: { id: leadId } }),
@@ -157,7 +168,8 @@ async function draftReplyForApproval(opts: {
     thread,
     theirReply,
     availability, // real calendar slots from the connected calendar (M4)
-    variantCount: 2,
+    variantCount: holdForReview ? 1 : 2,
+    holdForReview,
   });
 
   const draft = await prisma.$transaction(async (tx) => {

@@ -647,6 +647,10 @@ model Conversation {
   // §3/§7). v1 default is false → reply drafts go to the approval queue.
   autopilot Boolean @default(false)
 
+  // §5 confidence gate: why this thread needs careful human attention (hostile,
+  // off-script, unverifiable question). Null = a clear, confidently-read reply.
+  reviewReason String?
+
   lastInboundAt  DateTime?
   lastOutboundAt DateTime?
 

@@ -75,6 +75,10 @@ export interface ReplyDraftInput {
   theirReply: string; // the latest inbound message we're responding to
   availability: string[]; // real slots the agent may offer (empty if none yet)
   variantCount: number; // 1–2
+  // §5 confidence gate: when true the reply must be a SAFE HOLDING note (defer to
+  // the human, promise a personal follow-up) — never a confident answer to
+  // something off-script or unverifiable.
+  holdForReview?: boolean;
 }
 
 export interface VoiceLearnInput {

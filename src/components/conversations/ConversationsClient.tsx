@@ -23,6 +23,7 @@ export interface ConversationVM {
   initials: string;
   status: string; // ConversationStatus
   leadStatus: string;
+  reviewReason: string | null; // §5: why this thread needs careful attention
   booking: { whenLabel: string; meetingUrl: string | null } | null;
   lastSnippet: string;
   when: string;
@@ -141,6 +142,16 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
           <Booked booking={active.booking} />
         ) : (
           <div className="flex flex-col gap-3 border-t border-line-2 bg-[#FBFAF7] px-6 py-4">
+            {active.reviewReason && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-[#f0dcc9] bg-[#FBF3EC] px-3.5 py-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a16207" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-none">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
+                </svg>
+                <p className="m-0 text-[12.5px] leading-[1.45] text-[#7a5a44]">
+                  <span className="font-semibold text-[#5a4030]">Flagged for you: </span>{active.reviewReason}. The agent drafted a safe holding reply rather than guess.
+                </p>
+              </div>
+            )}
             {active.status === "NEEDS_REVIEW" && (
               <div className="flex items-center gap-3">
                 <span className="h-2 w-2 flex-none animate-wsPulse rounded-full bg-ember" />

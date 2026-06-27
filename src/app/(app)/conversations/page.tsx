@@ -34,6 +34,7 @@ export default async function ConversationsPage() {
       initials: initials(name),
       status: c.status,
       leadStatus: c.lead.status,
+      reviewReason: c.reviewReason,
       booking: c.booking
         ? {
             whenLabel: c.booking.startsAt.toLocaleString("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
