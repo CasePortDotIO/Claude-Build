@@ -408,3 +408,28 @@ lifecycle status is recorded and queryable. Tests 134 → 146.
 Note: business-hours config + booking-outcome controls have server actions +
 schema but minimal UI surfacing yet (the acceptance is data/behavior); a
 Conversations/Calls panel can expose them next.
+
+---
+
+## M14 — [P2] §8 Guarantee tracker + dashboard instrumentation
+
+The offer carries a "book at least X calls in 30 days or you don't pay"
+guarantee. For that to be settled by facts, not arguments, it has to be
+measurable in-product, per customer, on a rolling window.
+
+- **The threshold `X` lives in exactly one place** (`lib/guarantee.ts`:
+  `GUARANTEE_CALLS_DEFAULT`), with an optional per-org override (`Org.guaranteeCalls`,
+  null → the default). `guaranteeThreshold()` is the only reader of the override;
+  no hard-coded duplicate of X exists anywhere.
+- **`guaranteeStatus(orgId)`** counts BOOKED_STATUSES bookings in the trailing
+  30-day window vs X → `{ booked, threshold, met, remaining, progressPct }`.
+- **GuaranteeTracker** card on the Command Center: live "N / X calls booked",
+  progress bar, met/in-progress state, "M more in the next 30 days" copy.
+- Dashboard instrumentation extended: `commandCenterKpis` now also reports
+  `callsShowed` (from the §6 lifecycle) and `reachableWorking` (verified leads in
+  play). Recovered-revenue is derived from real booking data (BOOKED_STATUSES ×
+  snapshotted deal value), never hard-coded.
+
+Acceptance met: X defined once and referenced everywhere; the dashboard reports
+booked-calls-in-trailing-30-days and whether the bar is met; value is real-data
+derived. Tests 146 → 149.

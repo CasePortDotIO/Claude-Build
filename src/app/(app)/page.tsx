@@ -7,8 +7,10 @@ import { formatMoney, timeAgo } from "@/lib/format";
 import { FirstRunGuide } from "@/components/magic/FirstRunGuide";
 import { BookingCelebration } from "@/components/magic/BookingCelebration";
 import { MorningBrief } from "@/components/magic/MorningBrief";
+import { GuaranteeTracker } from "@/components/magic/GuaranteeTracker";
 import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
+import { guaranteeStatus } from "@/lib/guarantee";
 
 // Command Center — real data (M4). KPI row, reactivations chart, live activity
 // feed, and the latest agent action. The "agent updated itself" self-improvement
@@ -24,7 +26,7 @@ export default async function CommandCenter() {
     latestBooking(ctx.orgId),
     dailyBrief(ctx.orgId),
   ]);
-  const streak = await engagementStreak(ctx.orgId);
+  const [streak, guarantee] = await Promise.all([engagementStreak(ctx.orgId), guaranteeStatus(ctx.orgId)]);
   const today = new Date().toISOString().slice(0, 10); // per-day collapse key for the brief
 
   const maxBar = Math.max(1, ...chart.map((b) => b.value));
@@ -64,13 +66,18 @@ export default async function CommandCenter() {
             </p>
             <p className="m-0 text-[12.5px] text-[#bfe6d5]">from {kpis.callsBooked} booked call{kpis.callsBooked === 1 ? "" : "s"}</p>
           </div>
-          <KpiCard label="Calls booked" value={kpis.callsBooked} sub="agent → calendar" />
+          <KpiCard label="Calls booked" value={kpis.callsBooked} sub={kpis.callsShowed > 0 ? `${kpis.callsShowed} showed` : "agent → calendar"} />
           <KpiCard
             label="Reply rate"
             value={`${Math.round(kpis.replyRate * 100)}%`}
             sub={`${kpis.replied} of ${kpis.contacted} contacted`}
           />
-          <KpiCard label="Active conversations" value={kpis.activeConversations} sub="the agent is handling" accent />
+          <KpiCard label="Reachable in play" value={kpis.reachableWorking} sub="verified leads being worked" accent />
+        </div>
+
+        {/* §8: the guarantee, measurable in-product */}
+        <div className="mb-[22px]">
+          <GuaranteeTracker status={guarantee} />
         </div>
 
         {/* the agent updated itself — wired to the latest applied insight */}

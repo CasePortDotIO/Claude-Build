@@ -6,20 +6,25 @@ import { BOOKED_STATUSES } from "@/lib/booking-status";
 export interface CommandCenterKpis {
   recoveredRevenueCents: number;
   callsBooked: number;
+  callsShowed: number;
   replyRate: number; // 0..1
   contacted: number;
   replied: number;
   activeConversations: number;
+  reachableWorking: number; // §8: reachable leads currently in play
 }
 
 export async function commandCenterKpis(orgId: string): Promise<CommandCenterKpis> {
-  const [revenue, callsBooked, contacted, replied, active] = await Promise.all([
+  const [revenue, callsBooked, callsShowed, contacted, replied, active, reachableWorking] = await Promise.all([
     prisma.booking.aggregate({ where: { orgId, status: { in: BOOKED_STATUSES } }, _sum: { valueCents: true } }),
     prisma.booking.count({ where: { orgId, status: { in: BOOKED_STATUSES } } }),
+    prisma.booking.count({ where: { orgId, status: "SHOWED" } }),
     // "Contacted" = at least one outbound message went out.
     prisma.message.findMany({ where: { orgId, direction: "OUTBOUND" }, distinct: ["leadId"], select: { leadId: true } }),
     prisma.message.findMany({ where: { orgId, direction: "INBOUND", isAutoReply: false, isBounce: false }, distinct: ["leadId"], select: { leadId: true } }),
     prisma.conversation.count({ where: { orgId, status: { in: ["ACTIVE", "AWAITING_REPLY", "NEEDS_REVIEW"] } } }),
+    // Reachable leads still being worked (not terminal / opted-out / bounced).
+    prisma.lead.count({ where: { orgId, reachability: "REACHABLE", status: { notIn: ["BOOKED", "OPTED_OUT", "DO_NOT_CONTACT", "BOUNCED", "CLOSED_LOST"] } } }),
   ]);
 
   const contactedN = contacted.length;
@@ -27,10 +32,12 @@ export async function commandCenterKpis(orgId: string): Promise<CommandCenterKpi
   return {
     recoveredRevenueCents: revenue._sum.valueCents ?? 0,
     callsBooked,
+    callsShowed,
     replyRate: contactedN ? repliedN / contactedN : 0,
     contacted: contactedN,
     replied: repliedN,
     activeConversations: active,
+    reachableWorking,
   };
 }
 

@@ -66,6 +66,10 @@ model Org {
   // reveal + recovered-revenue math. 0 until the operator tells us.
   avgClientValueCents Int @default(0)
 
+  // §8 guarantee override (X calls / 30 days). Null → the single default in
+  // lib/guarantee.ts; the threshold is never hard-coded anywhere else.
+  guaranteeCalls Int?
+
   // CAN-SPAM: a real physical mailing address shown in every email (enforced M5).
   mailingAddress String?
 
