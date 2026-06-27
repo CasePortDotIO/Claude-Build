@@ -192,6 +192,13 @@ model Lead {
   lastTouchAt  DateTime? // last time we contacted them (for cooldown)
   coolDownUntil DateTime?
 
+  // M11: pre-flight list hygiene (§3). Every imported address is verified before
+  // it can ever be sent to. INVALID is never sendable (and is suppressed). RISKY
+  // is held out of the initial warmup ramp. verifiedAt drives 30-day re-checks.
+  reachability Reachability @default(REACHABLE)
+  verifiedAt   DateTime?
+  verifyReason String? // why it landed risky/invalid (role account, no MX, …)
+
   source     String? // "csv", "hubspot", ...
   importId   String?
   import     LeadImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
@@ -257,6 +264,14 @@ enum SuppressionReason {
   COMPLAINED
   MANUAL
   DO_NOT_CONTACT
+  INVALID // failed pre-flight verification (§3) — bad syntax / no MX
+}
+
+// M11: pre-flight verification verdict for an imported address (§3 list hygiene).
+enum Reachability {
+  REACHABLE // safe to send
+  RISKY // deliverable but lower-quality (role account, catch-all, parked) — warmup holdout
+  INVALID // never sendable (bad syntax, no MX) — hard-suppressed
 }
 
 // Global per-org suppression list. An email here must never be contacted.

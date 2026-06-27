@@ -166,13 +166,19 @@ export function ImportWizard() {
           )}
         </div>
 
-        {/* the receipts — honest accounting of what landed vs. was filtered */}
+        {/* §3 verification receipts — what we'll actually send to vs. what we
+            filtered out before it could ever touch the sending domain */}
         <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat n={imported} label="imported" tone="sweep" />
-          <Stat n={result.duplicatesInDb ?? 0} label="already in list" />
-          <Stat n={result.suppressed ?? 0} label="suppressed" />
-          <Stat n={result.skipped ?? 0} label="bad / no email" />
+          <Stat n={result.reachable ?? 0} label="reachable — sending to these" tone="sweep" />
+          <Stat n={result.risky ?? 0} label="risky — held for warmup" />
+          <Stat n={result.invalid ?? 0} label="invalid — suppressed" />
+          <Stat n={(result.duplicatesInDb ?? 0) + (result.suppressed ?? 0) + (result.skipped ?? 0)} label="duplicate / filtered" />
         </ul>
+        <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-2">
+          Every address was verified before queueing — syntax, domain MX records, role accounts and known-bad
+          addresses are filtered so your sending domain only ever touches deliverable contacts. That&apos;s how the
+          reactivation works without burning your reputation.
+        </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <button

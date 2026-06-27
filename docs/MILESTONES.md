@@ -297,3 +297,52 @@ tracker. The current count rides along on the Slack + email triggers too
 (loss-aversion via the daily nudge). UTC day boundaries for v1 (no stored tz).
 Seed plants a 5-day streak for Monroe so the demo shows a live chain.
 Tests 113 → 118.
+
+---
+
+## M11 — [P0] List hygiene: the pre-flight input gate (§3)
+
+The category's #1 failure: dead lists are the dirtiest input there is, and naive
+products send to them blindly — 15–20% bounce, the domain gets flagged, the
+guarantee dies on day one. M11 makes verification a hard gate *before* a single
+address can be queued.
+
+- **Swappable verifier** (`lib/verify/`): `EmailVerifier` interface + a no-vendor
+  `LocalVerifier` (strict syntax, role-account detection, disposable domains, live
+  MX lookup with an injectable resolver). A paid API drops in behind the interface
+  via `getEmailVerifier()` — never hard-wired. Conservative by design: only marks
+  INVALID when certain (bad syntax / no MX); a failed DNS lookup yields RISKY, not
+  a false-positive deletion.
+- **Classification** (`Reachability`: REACHABLE / RISKY / INVALID) stamped on every
+  lead at import, with `verifiedAt` + `verifyReason`. Wired into the shared
+  `ingestLeads` pipeline so CSV *and* every M7 lead source pass through it.
+  - **INVALID** → hard-suppressed (`SuppressionReason.INVALID`), never created as a
+    sendable lead; a re-import drops it at the suppression filter.
+  - **RISKY** → kept and flagged, but **held out of the warmup ramp** at send time
+    (`send.ts` blocks RISKY while the mailbox is still warming).
+- **Reachable count** surfaced on the import reveal: reachable / risky / invalid /
+  filtered, with the dormant-pipeline math now based on the *reachable* set only.
+- **30-day re-verification** (`reverifyStale`) on the nightly cron — data decays;
+  unsent leads past the window are re-checked and demoted/suppressed if they've
+  gone INVALID.
+- Hard-bounce → suppression(BOUNCED) + lead BOUNCED was already enforced (M5); §3's
+  "never retry a hard bounce" criterion holds.
+
+Acceptance criteria met: no send to an unverified/failed address; dirty-list import
+reports a reachable count and queues only deliverable contacts; invalid addresses
+are suppressed and never retried. Tests 118 → 127.
+
+### Stack note (spec adaptation)
+The spec assumes Resend + Supabase. The actual build uses a per-org **MailboxProvider**
+abstraction (Gmail/Microsoft/Simulation) on Prisma/Postgres. The §1 constraint
+"per-customer isolated sending, never shared" is **already satisfied** — each org
+connects its own authenticated mailbox; sending identity is `orgId`-scoped end to
+end. No refactor needed; swapping transport to Resend would be a separate decision.
+
+### Remaining spec work (tracked, not yet built)
+- §4 gaps: block send until SPF/DKIM/DMARC pass; circuit-breaker "require re-scrub
+  before resume"; align alert(2%/0.1%) vs hard-stop(5%/0.3%) thresholds. (Warmup
+  ramp + auto-pause already live from M5.)
+- §5 confidence gate / conservative qualification hardening · §6 booking
+  timezone/buffers + no-show reminders + lifecycle status · §7 onboarding · §8
+  guarantee tracker (single `[X]` config) · §9 one-click cancel · §10 outcome log.

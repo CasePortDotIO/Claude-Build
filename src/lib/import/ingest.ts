@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { assertPriorContact, PriorContactError } from "@/lib/import/prior-contact-gate";
+import { getEmailVerifier } from "@/lib/verify";
 import type { MappedLead } from "@/lib/import/mapping";
-import type { ConsentBasis, Prisma } from "@prisma/client";
+import type { ConsentBasis, Prisma, Reachability } from "@prisma/client";
 
 /**
  * The single lead-ingest pipeline shared by every importer (CSV + all M7 lead
@@ -29,21 +30,26 @@ export interface IngestResult {
   ok: boolean;
   error?: string;
   importId?: string;
-  imported: number;
+  imported: number; // sendable leads created (reachable + risky)
   duplicatesInDb: number;
   suppressed: number;
+  // §3 pre-flight verification breakdown.
+  reachable: number;
+  risky: number;
+  invalid: number; // failed verification — suppressed, never created as sendable
 }
 
 export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Promise<IngestResult> {
   // (1) Hard gate — reactivation, not cold outreach.
+  const empty = { imported: 0, duplicatesInDb: 0, suppressed: 0, reachable: 0, risky: 0, invalid: 0 };
   try {
     assertPriorContact({ attested: opts.priorContactAttested, consentBasis: opts.consentBasis });
   } catch (e) {
-    if (e instanceof PriorContactError) return { ok: false, error: e.message, imported: 0, duplicatesInDb: 0, suppressed: 0 };
+    if (e instanceof PriorContactError) return { ok: false, error: e.message, ...empty };
     throw e;
   }
   if (leads.length === 0) {
-    return { ok: false, error: "No valid leads to import.", imported: 0, duplicatesInDb: 0, suppressed: 0 };
+    return { ok: false, error: "No valid leads to import.", ...empty };
   }
 
   // (2) Filter against suppression list + existing org leads (all org-scoped).
@@ -55,10 +61,26 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
   const suppressedSet = new Set(suppressedRows.map((r) => r.email));
   const existingSet = new Set(existingRows.map((r) => r.email));
 
-  const toInsert = leads.filter((l) => !suppressedSet.has(l.email) && !existingSet.has(l.email));
+  const candidates = leads.filter((l) => !suppressedSet.has(l.email) && !existingSet.has(l.email));
   const duplicatesInDb = leads.filter((l) => existingSet.has(l.email)).length;
   const suppressed = leads.filter((l) => suppressedSet.has(l.email)).length;
   const totalRows = opts.totalRows ?? leads.length;
+
+  // (2b) §3 PRE-FLIGHT VERIFICATION — the input gate. Classify every candidate
+  // before a single one can be queued. INVALID is never created as a sendable
+  // lead; it's hard-suppressed so a re-import can't resurrect it. RISKY is kept
+  // but flagged (held out of the warmup ramp at send time). This is the line
+  // between "reactivate dead leads" working and burning the customer's domain.
+  const verifier = getEmailVerifier();
+  const verdicts = await verifier.verify(candidates.map((l) => l.email));
+  const byEmail = new Map(verdicts.map((v) => [v.email.toLowerCase(), v]));
+  const verdictFor = (email: string) =>
+    byEmail.get(email.toLowerCase()) ?? { email, status: "RISKY" as Reachability, reason: "unverified" };
+
+  const toInsert = candidates.filter((l) => verdictFor(l.email).status !== "INVALID");
+  const invalidEmails = candidates.map((l) => l.email).filter((e) => verdictFor(e).status === "INVALID");
+  const reachable = toInsert.filter((l) => verdictFor(l.email).status === "REACHABLE").length;
+  const risky = toInsert.length - reachable;
 
   // M9: stamp each lead with the operator's average client value so the dormant
   // pipeline is real and the recovered-revenue KPI has something to count when
@@ -83,23 +105,44 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
     });
 
     if (toInsert.length > 0) {
+      const now = new Date();
       await tx.lead.createMany({
-        data: toInsert.map((l) => ({
+        data: toInsert.map((l) => {
+          const v = verdictFor(l.email);
+          return {
+            orgId: opts.orgId,
+            importId: batch.id,
+            source: opts.source,
+            consentBasis: opts.consentBasis,
+            priorContact: true,
+            status: "NEW" as const,
+            email: l.email,
+            firstName: l.firstName,
+            lastName: l.lastName,
+            company: l.company,
+            phone: l.phone,
+            originalInquiry: l.originalInquiry,
+            statedGoal: l.statedGoal,
+            region: l.region,
+            dealValueCents,
+            reachability: v.status,
+            verifiedAt: now,
+            verifyReason: v.reason,
+          };
+        }),
+        skipDuplicates: true,
+      });
+    }
+
+    // INVALID addresses are hard-suppressed so they can never be sent to, and a
+    // future re-import drops them at the suppression filter above.
+    if (invalidEmails.length > 0) {
+      await tx.suppressionEntry.createMany({
+        data: invalidEmails.map((email) => ({
           orgId: opts.orgId,
-          importId: batch.id,
-          source: opts.source,
-          consentBasis: opts.consentBasis,
-          priorContact: true,
-          status: "NEW" as const,
-          email: l.email,
-          firstName: l.firstName,
-          lastName: l.lastName,
-          company: l.company,
-          phone: l.phone,
-          originalInquiry: l.originalInquiry,
-          statedGoal: l.statedGoal,
-          region: l.region,
-          dealValueCents,
+          email: email.toLowerCase(),
+          reason: "INVALID" as const,
+          note: verdictFor(email).reason,
         })),
         skipDuplicates: true,
       });
@@ -112,12 +155,21 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
         action: "lead.import",
         targetType: "LeadImport",
         targetId: batch.id,
-        metadata: { source: opts.source, imported: toInsert.length, duplicatesInDb, suppressed },
+        metadata: { source: opts.source, imported: toInsert.length, duplicatesInDb, suppressed, reachable, risky, invalid: invalidEmails.length },
       },
     });
 
     return batch;
   });
 
-  return { ok: true, importId: record.id, imported: toInsert.length, duplicatesInDb, suppressed };
+  return {
+    ok: true,
+    importId: record.id,
+    imported: toInsert.length,
+    duplicatesInDb,
+    suppressed,
+    reachable,
+    risky,
+    invalid: invalidEmails.length,
+  };
 }

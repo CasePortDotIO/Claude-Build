@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { runReflection } from "@/lib/agent/reflection";
-import { reengagementSweep } from "@/lib/agent/maintenance";
+import { reengagementSweep, reverifyStale } from "@/lib/agent/maintenance";
 import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
 import { notifyMorningBrief } from "@/lib/notify";
@@ -38,6 +38,8 @@ async function runJob(req: NextRequest) {
     // Follow-up branch: cool leads that went silent past the learned gap.
     const sweep = await reengagementSweep(org.id);
     totalCooled += sweep.cooled;
+    // §3: re-verify contacts that have sat unsent >30 days (data decays).
+    await reverifyStale(org.id);
     // M10: the overnight Morning Brief — the habit-loop trigger, on every channel.
     const brief = await dailyBrief(org.id);
     const streak = await engagementStreak(org.id);

@@ -16,6 +16,10 @@ export interface ImportResult {
   skipped?: number;
   duplicatesInDb?: number;
   suppressed?: number;
+  // §3 pre-flight verification breakdown.
+  reachable?: number;
+  risky?: number;
+  invalid?: number;
   // M9: the dormant-pipeline reveal — what just walked back through the door.
   avgClientValueCents?: number;
   dormantPipelineCents?: number; // imported × avg client value
@@ -77,7 +81,11 @@ export async function importLeadsAction(raw: unknown): Promise<ImportResult> {
     skipped: skipped.length,
     duplicatesInDb: res.duplicatesInDb,
     suppressed: res.suppressed,
+    reachable: res.reachable,
+    risky: res.risky,
+    invalid: res.invalid,
     avgClientValueCents,
-    dormantPipelineCents: avgClientValueCents * res.imported,
+    // The dormant pipeline is what we can actually WORK — the reachable set only.
+    dormantPipelineCents: avgClientValueCents * res.reachable,
   };
 }

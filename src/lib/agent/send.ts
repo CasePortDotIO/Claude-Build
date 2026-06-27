@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
 import { transition } from "@/lib/agent/state-machine";
 import { assertContactable, ComplianceError, complianceFooter, withComplianceFooter, unsubscribeUrl } from "@/lib/compliance";
-import { effectiveDailyCap } from "@/lib/compliance/caps";
+import { effectiveDailyCap, isWarmingUp } from "@/lib/compliance/caps";
 import type { Mailbox } from "@prisma/client";
 
 export class SendError extends Error {
@@ -78,6 +78,12 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
   }
   if (mailbox.sentThisHour >= mailbox.hourlyCap) {
     throw new SendError(`Hourly send cap reached for ${mailbox.email} (${mailbox.hourlyCap}/hr). It'll resume shortly.`);
+  }
+
+  // §3: RISKY addresses are held out of the initial warmup ramp — a new domain's
+  // scarce early reputation goes to clean, reachable contacts first.
+  if (lead.reachability === "RISKY" && isWarmingUp(mailbox)) {
+    throw new SendError(`Held out of the warmup ramp: ${lead.email} verified RISKY (${lead.verifyReason ?? "lower-quality"}). It'll become eligible once ${mailbox.email} is warmed.`);
   }
 
   // Append the CAN-SPAM footer (unsubscribe link + physical address).
