@@ -59,7 +59,12 @@ model Org {
   // M8 per-seat billing (what the agency charges this client).
   clientPriceCents Int    @default(0)
   seats            Int    @default(1)
-  billingStatus    String @default("active") // active | trial | past_due | paused
+  billingStatus    String @default("active") // active | trial | past_due | paused | canceled
+  canceledAt       DateTime? // §9 self-serve cancellation timestamp
+
+  // §10 customer-type / vertical tag (set at onboarding), for privacy-clean
+  // aggregate pattern-learning across the outcome log. Never customer-facing.
+  vertical String?
 
   // M9: what one client is worth to this coach. Set once during the first sweep;
   // stamps each imported lead's dealValueCents and powers the "dormant pipeline"
@@ -103,6 +108,9 @@ model Org {
 
   // M7: lead source integrations (importers behind the LeadSource adapter)
   leadSources LeadSourceConnection[]
+
+  // §10: append-only outcome log for aggregate pattern-learning.
+  outcomeEvents OutcomeEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -715,6 +723,40 @@ enum BookingStatus {
   NO_SHOW // booked but didn't attend
   RESCHEDULED // moved to a new time
   CANCELED
+}
+
+// §10 — Outcome-data capture (the durable asset). An append-only log of what
+// actually converts cold leads: subject line, message variant, send timing, the
+// org's vertical, and the outcome. Powers future cadence/subject optimization and
+// per-vertical defaults. AGGREGATE pattern-learning only — never a surface that
+// exposes one customer's data to another; contacts are never moved between orgs.
+enum OutcomeKind {
+  SENT
+  REPLIED
+  QUALIFIED
+  BOOKED
+  SHOWED
+  NO_SHOW
+  OPTED_OUT
+}
+
+model OutcomeEvent {
+  id     String @id @default(cuid())
+  orgId  String
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId String?
+
+  kind         OutcomeKind
+  subject      String? // the subject line that was sent (for subject-line learning)
+  variantAngle String? // which draft angle (goal-led / curiosity / direct / …)
+  sendHour     Int? // hour-of-day the send went out (0–23), for timing learning
+  vertical     String? // org's customer-type tag, snapshotted
+  valueCents   Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, kind])
+  @@index([vertical, kind])
 }
 
 // A booked call — the terminal success of the agent loop.

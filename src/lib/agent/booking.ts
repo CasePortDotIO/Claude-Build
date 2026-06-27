@@ -7,6 +7,7 @@ import { slotLabel } from "@/lib/calendar/slots";
 import { validateBookingSlot } from "@/lib/calendar/validate";
 import { sendBookingConfirmation } from "@/lib/agent/reminders";
 import { ACTIVE_SLOT_STATUSES } from "@/lib/booking-status";
+import { recordOutcome } from "@/lib/outcomes";
 
 export class BookingError extends Error {
   constructor(message: string) {
@@ -145,6 +146,8 @@ export async function bookCall(opts: {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email;
   await notifyBooking({ orgId, leadName: name, whenLabel: slotLabel(startsAt), meetingUrl });
   await sendBookingConfirmation(booking.id).catch(() => {});
+  // §10: a booked call is the headline conversion.
+  await recordOutcome({ orgId, leadId, kind: "BOOKED", valueCents: lead.dealValueCents });
 
   return booking;
 }

@@ -460,3 +460,40 @@ adds the judgement layer so the *drafted* reply is never a confident guess.
 Acceptance met: off-script/ambiguous replies trigger the gate (held reply +
 flag) instead of a confident wrong answer; qualification is conservative and
 reasoned; no AI self-disclosure in any lead-facing copy. Tests 149 → 155.
+
+---
+
+## M16 — [P2] §9 One-click cancellation + §10 Outcome-data capture (spec complete)
+
+### §9 — Self-serve cancellation
+Frictionless cancellation is a trust signal and cuts disputes. `/account` page:
+one click to cancel behind a single plain confirm (no retention maze, no
+"contact us"), with on-screen + email confirmation that says exactly what
+happens — sending stops, data is kept and exportable, reactivation is one click.
+- `cancelSubscriptionAction` → `billingStatus: "canceled"` + `canceledAt`, emails
+  the operator, audits. `reactivateSubscriptionAction` reverses it in one click.
+- **Sending halts immediately:** `send.ts` refuses a `canceled`/`paused`
+  workspace before it touches a mailbox (tested).
+- Reachable from the sidebar footer (gear icon).
+
+### §10 — Outcome-data capture (the durable asset)
+Append-only `OutcomeEvent` log (`lib/outcomes.ts`): subject line, message variant
+(angle), send hour, org vertical, and the outcome (SENT / REPLIED / BOOKED / …),
+emitted best-effort from the send, reply, and booking paths. `outcomeAggregates`
+rolls it up by angle / hour / vertical for future cadence + subject optimization
+and per-vertical defaults. Strictly org-scoped + privacy-clean: aggregate
+pattern-learning only, never a surface that exposes one customer's rows to
+another, and contacts are never moved between orgs.
+
+Tests 155 → 160.
+
+---
+
+## ✅ Competitive Hardening Spec — COMPLETE
+All sections shipped, enforced in code, and tested:
+- **P0:** §3 list hygiene (M11) · §4 deliverability circuit breaker + domain auth (M5/M12)
+- **P1:** §5 reply confidence gate (M15) · §6 booking quality + no-show (M13) · §7 onboarding (M9)
+- **P2:** §8 guarantee tracker (M14) · §9 cancellation (M16) · §10 outcome log (M16)
+- **§1 non-negotiables:** per-customer isolation, email-only, model-agnostic, no AI persona — all held.
+
+The §12 end-to-end flow is live and tested. 160 tests; clean build.

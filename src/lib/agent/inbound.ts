@@ -9,6 +9,7 @@ import { availabilityLabels } from "@/lib/agent/booking";
 import { storeMemory } from "@/lib/memory";
 import { autoPauseDecision } from "@/lib/compliance/caps";
 import { classifyReplyIntent } from "@/lib/agent/reply-intent";
+import { recordOutcome } from "@/lib/outcomes";
 import type { ThreadTurn, VoiceProfileShape } from "@/lib/ai/types";
 
 export interface IngestResult {
@@ -107,6 +108,8 @@ export async function ingestInboundEmail(opts: {
   }
   // Memory: the lead's own words are valuable signal.
   await storeMemory({ orgId, kind: "LEAD_REPLY", content: email.body, leadId: lead.id });
+  // §10: a genuine reply is a conversion signal.
+  await recordOutcome({ orgId, leadId: lead.id, kind: "REPLIED" });
 
   // §5 confidence gate: read the reply's intent before drafting. Off-script,
   // ambiguous, hostile, or unverifiable → hold with a safe reply + flag why.

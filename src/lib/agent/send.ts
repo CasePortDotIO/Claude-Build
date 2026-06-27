@@ -4,6 +4,7 @@ import { transition } from "@/lib/agent/state-machine";
 import { assertContactable, ComplianceError, complianceFooter, withComplianceFooter, unsubscribeUrl } from "@/lib/compliance";
 import { effectiveDailyCap, isWarmingUp } from "@/lib/compliance/caps";
 import { assertDomainAuthorized, DomainAuthError } from "@/lib/compliance/deliverability";
+import { recordOutcome } from "@/lib/outcomes";
 import type { Mailbox } from "@prisma/client";
 
 export class SendError extends Error {
@@ -63,7 +64,11 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
   }
 
   // CAN-SPAM: a real physical mailing address is required in every email.
-  const org = await prisma.org.findUniqueOrThrow({ where: { id: orgId }, select: { name: true, brandName: true, mailingAddress: true } });
+  const org = await prisma.org.findUniqueOrThrow({ where: { id: orgId }, select: { name: true, brandName: true, mailingAddress: true, billingStatus: true } });
+  // §9: a canceled/paused workspace sends nothing — cancellation halts sending now.
+  if (org.billingStatus === "canceled" || org.billingStatus === "paused") {
+    throw new SendError("Sending is off for this workspace (subscription canceled). Reactivate from Account to resume.");
+  }
   if (!org.mailingAddress) {
     throw new SendError("Set your physical mailing address (Connections) before sending — required by CAN-SPAM.");
   }
@@ -157,6 +162,12 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
       data: { orgId, action: "message.send", targetType: "Lead", targetId: lead.id, metadata: { draftId: draft.id, provider: mailbox!.provider } },
     });
   });
+
+  // §10: log the send for aggregate subject/timing learning (best-effort).
+  const angle = draft.selectedVariantId
+    ? (await prisma.draftVariant.findUnique({ where: { id: draft.selectedVariantId }, select: { angle: true } }))?.angle ?? null
+    : null;
+  await recordOutcome({ orgId, leadId: lead.id, kind: "SENT", subject: draft.finalSubject, variantAngle: angle, valueCents: lead.dealValueCents });
 
   return { sent, conversationLeadId: lead.id };
 }
