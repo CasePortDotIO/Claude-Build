@@ -5,6 +5,7 @@ import { runReflection } from "@/lib/agent/reflection";
 import { reengagementSweep } from "@/lib/agent/maintenance";
 import { dailyBrief } from "@/lib/retention";
 import { notifyMorningBrief } from "@/lib/notify";
+import { emailMorningBrief } from "@/lib/agent/digest";
 
 /**
  * Nightly reflection job (§8). In production this is invoked on a schedule —
@@ -29,18 +30,21 @@ async function runJob(req: NextRequest) {
   let totalInsights = 0;
   let totalCooled = 0;
   let briefsPushed = 0;
+  let briefsEmailed = 0;
   for (const org of orgs) {
     const res = await runReflection(org.id);
     totalInsights += res.created;
     // Follow-up branch: cool leads that went silent past the learned gap.
     const sweep = await reengagementSweep(org.id);
     totalCooled += sweep.cooled;
-    // M10: push the overnight Morning Brief to Slack — the habit-loop trigger.
+    // M10: the overnight Morning Brief — the habit-loop trigger, on every channel.
     const brief = await dailyBrief(org.id);
-    const sent = await notifyMorningBrief(org.id, brief);
-    if (sent.slack) briefsPushed++;
+    const slack = await notifyMorningBrief(org.id, brief);
+    if (slack.slack) briefsPushed++;
+    const email = await emailMorningBrief(org.id, brief);
+    briefsEmailed += email.emailed;
   }
-  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed });
+  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed, briefsEmailed });
 }
 
 // Vercel Cron uses GET; external schedulers may POST. Both require the secret.

@@ -272,3 +272,14 @@ GDPR-respecting product and they raise gross churn. The moat is value, not walls
 
 Tests 105 → 109 (maturity scoring climbs with training, ledger sums confirmed
 bookings, brief windows + pending). Build clean; both surfaces verified live.
+
+### M10.1 · Morning Brief email digest (universal trigger)
+The Slack push only reaches orgs with a webhook; the email digest reaches every
+operator who connected a mailbox. `emailMorningBrief` (`lib/agent/digest.ts`)
+sends a plain-text recap to each workspace member via the connected mailbox
+provider. It's a **transactional self-notification**, so it deliberately bypasses
+the lead-send compliance footer, suppression list, and daily caps — none apply to
+emailing a coach their own recap. Idempotent per calendar day (audit-logged),
+activity-gated (silent on quiet nights), best-effort (never throws into the
+nightly job). Wired into the reflection cron next to the Slack push; the route
+now reports `briefsEmailed`. Tests 109 → 113.
