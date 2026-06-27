@@ -60,7 +60,7 @@ export function renderBrief(brief: DailyBrief, brand: string, streakCurrent = 0)
       : brief.replied > 0
         ? `${brief.replied} lead${brief.replied === 1 ? "" : "s"} replied`
         : `${brief.drafted} draft${brief.drafted === 1 ? "" : "s"} ready`;
-  const subject = `☀️ Your ${brand} brief — ${headline}`;
+  const subject = `Your ${brand} brief — ${headline}`;
 
   const base = (process.env.NEXTAUTH_URL || "").replace(/\/$/, "");
   const lines: string[] = [
@@ -86,7 +86,7 @@ export function renderBrief(brief: DailyBrief, brand: string, streakCurrent = 0)
     lines.push(``, base ? `Start your next sweep: ${base}/leads` : `Open The Warm Sweep to start your next sweep.`);
   }
   if (streakCurrent >= 2) {
-    lines.push(``, `🔥 You're on a ${streakCurrent}-day streak. Review today to keep the chain going.`);
+    lines.push(``, `You're on a ${streakCurrent}-day streak. Review today to keep the chain going.`);
   }
   lines.push(``, `— ${brand}`, `You're receiving this because you run a workspace here. It only sends on days with activity.`);
   return { subject, body: lines.join("\n") };

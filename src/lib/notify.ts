@@ -28,13 +28,13 @@ async function postSlack(orgId: string, text: string): Promise<boolean> {
 export async function notifyMorningBrief(orgId: string, brief: DailyBrief, streakCurrent = 0): Promise<{ slack: boolean }> {
   if (!brief.hasActivity) return { slack: false };
   const lines = [
-    `☀️ *Your Warm Sweep — overnight brief*`,
+    `*Your Warm Sweep — overnight brief*`,
     `• ${brief.drafted} drafted · ${brief.replied} replied · ${brief.booked} booked`,
   ];
   if (brief.recoveredCents > 0) lines.push(`• ${formatMoney(brief.recoveredCents)} reactivated (${formatMoney(brief.cumulativeRecoveredCents)} all-time)`);
-  if (brief.latestInsight) lines.push(`• 🧠 It learned: ${brief.latestInsight.body}`);
-  if (brief.pendingApprovals > 0) lines.push(`• ✍️ ${brief.pendingApprovals} draft${brief.pendingApprovals === 1 ? "" : "s"} need your nod`);
-  if (streakCurrent >= 2) lines.push(`• 🔥 ${streakCurrent}-day streak — review today to keep it alive`);
+  if (brief.latestInsight) lines.push(`• Learned: ${brief.latestInsight.body}`);
+  if (brief.pendingApprovals > 0) lines.push(`• ${brief.pendingApprovals} draft${brief.pendingApprovals === 1 ? "" : "s"} awaiting your review`);
+  if (streakCurrent >= 2) lines.push(`• ${streakCurrent}-day review streak — keep it going`);
   return { slack: await postSlack(orgId, lines.join("\n")) };
 }
 
@@ -69,7 +69,7 @@ export async function notifyBooking(opts: {
 
   try {
     const url = decryptSecret(org.slackWebhookEnc);
-    const text = `📅 *${leadName}* just booked a call — ${whenLabel}.${meetingUrl ? ` <${meetingUrl}|Join>` : ""} (you did nothing.)`;
+    const text = `*${leadName}* booked a call — ${whenLabel}.${meetingUrl ? ` <${meetingUrl}|Join>` : ""}`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },

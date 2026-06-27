@@ -6,6 +6,22 @@ import { formatMoney } from "@/lib/format";
 import type { DailyBrief } from "@/lib/retention";
 import type { StreakState } from "@/lib/streak";
 
+// Monochrome line icons — premium iconography in place of emoji.
+function SunriseIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 18h18M6 18a6 6 0 0 1 12 0M12 3v3M4.5 8.5l1.5 1.5M19.5 8.5L18 10M2 14h2M20 14h2" />
+    </svg>
+  );
+}
+function FlameIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 3c2.2 3 4.2 4.8 4.2 8.2A4.2 4.2 0 0 1 12 15.4a4.2 4.2 0 0 1-4.2-4.2c0-1.4.5-2.4 1.4-3.4C10 9 11 7 12 3z" />
+    </svg>
+  );
+}
+
 /**
  * The Morning Brief (M10) — the habit loop's daily payoff. The nightly agent run
  * produces fresh material every night; this surfaces it as the first thing the
@@ -45,11 +61,11 @@ export function MorningBrief({ brief, streak, dateKey }: { brief: DailyBrief; st
         onClick={() => setOpen(true)}
         className="mb-[22px] flex w-full items-center gap-3 rounded-xl2 border border-line bg-white px-5 py-3 text-left hover:bg-cream"
       >
-        <span className="text-[16px]">☀️</span>
+        <SunriseIcon className="flex-none text-ember" />
         <span className="text-[13.5px] font-semibold text-ink">Your morning brief</span>
         {streak.current > 0 && (
           <span className="flex items-center gap-1 rounded-full bg-[#fdf0e8] px-2 py-0.5 text-[12px] font-semibold text-ember">
-            🔥 {streak.current}
+            <FlameIcon /> {streak.current}
           </span>
         )}
         <span className="text-[12.5px] text-muted-2">
@@ -65,7 +81,7 @@ export function MorningBrief({ brief, streak, dateKey }: { brief: DailyBrief; st
     <div className="ws-rise mb-[22px] overflow-hidden rounded-xl2 border border-line bg-white">
       <div className="flex items-center justify-between border-b border-line-2 bg-charcoal px-6 py-4">
         <div className="flex items-center gap-2.5">
-          <span className="text-[18px]">☀️</span>
+          <SunriseIcon className="flex-none text-sweep-light" />
           <div>
             <p className="m-0 font-heading text-[16px] font-semibold text-white">Your morning brief</p>
             <p className="m-0 text-[12px] text-on-dark-soft">While you were away, the agent kept working.</p>
@@ -144,8 +160,8 @@ function StreakBar({ streak }: { streak: StreakState }) {
     streak.current === 0
       ? "Start a streak — review a draft today"
       : streak.activeToday
-        ? `🔥 ${streak.current}-day streak — kept alive today`
-        : `🔥 ${streak.current}-day streak — review today to keep it going`;
+        ? `${streak.current}-day streak — kept alive today`
+        : `${streak.current}-day streak — review today to keep it going`;
 
   return (
     <div
@@ -153,7 +169,8 @@ function StreakBar({ streak }: { streak: StreakState }) {
         streak.atRisk ? "border-[#f0dcc9] bg-[#fdf4ec]" : "border-line-2 bg-cream"
       }`}
     >
-      <span className={`text-[13px] font-semibold ${streak.atRisk ? "text-ember" : streak.current > 0 ? "text-ink" : "text-muted-2"}`}>
+      <span className={`flex items-center gap-1.5 text-[13px] font-semibold ${streak.atRisk ? "text-ember" : streak.current > 0 ? "text-ink" : "text-muted-2"}`}>
+        {streak.current > 0 && <FlameIcon className="text-ember" />}
         {headline}
       </span>
 
@@ -171,7 +188,11 @@ function StreakBar({ streak }: { streak: StreakState }) {
                     : "bg-white text-muted-3 ring-1 ring-line-2"
               }`}
             >
-              {d.active ? "✓" : DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}
+              {d.active ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+              ) : (
+                DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]
+              )}
             </span>
           </div>
         ))}

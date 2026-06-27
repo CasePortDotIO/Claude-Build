@@ -39,7 +39,12 @@ export function BookingCelebration({
 
   return (
     <div className="ws-rise mb-[22px] flex flex-wrap items-center gap-4 overflow-hidden rounded-xl2 border border-[rgba(27,122,87,0.3)] bg-gradient-to-r from-sweep to-[#15694a] px-6 py-5 text-white shadow-[0_8px_30px_-12px_rgba(27,122,87,0.6)]">
-      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white/15 text-[22px]">🎉</span>
+      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white/15">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l1.7 4.8 4.8 1.7-4.8 1.7L12 16l-1.7-4.8L5.5 9.5l4.8-1.7z" />
+          <path d="M19 14l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z" />
+        </svg>
+      </span>
       <div className="min-w-0 flex-1">
         <p className="m-0 font-heading text-[17px] font-semibold leading-[1.35]">
           {booking.name} just booked a call{booking.valueCents > 0 && <> — {formatMoney(booking.valueCents)} reactivated</>}
