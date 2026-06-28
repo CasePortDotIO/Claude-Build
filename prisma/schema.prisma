@@ -112,6 +112,13 @@ model Org {
   // §10: append-only outcome log for aggregate pattern-learning.
   outcomeEvents OutcomeEvent[]
 
+  // M17 autopilot (always-on): opt-in per workspace, default OFF so existing
+  // behavior is unchanged and nobody is surprised by auto-spend or auto-sends.
+  // The nightly autopilot job acts only on orgs that turned a capability on.
+  autopilotSync  Boolean @default(false) // poll connected lead sources on a schedule → ingest fresh leads
+  autopilotDraft Boolean @default(false) // auto-draft fresh NEW leads (queued for approval; never auto-sent unreviewed)
+  autopilotSend  Boolean @default(false) // auto-send drafts a human ALREADY approved (approval gate preserved)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

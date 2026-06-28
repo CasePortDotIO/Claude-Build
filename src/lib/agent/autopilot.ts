@@ -1,0 +1,107 @@
+import { prisma } from "@/lib/prisma";
+import { pullFromSource } from "@/lib/leadsource";
+import { ingestLeads } from "@/lib/import/ingest";
+import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
+import { sendAllApproved } from "@/lib/agent/send";
+
+/**
+ * Autopilot — the always-on engine (M17). Turns the product from a one-time
+ * reactivation tool ("vitamin") into infrastructure that works fresh leads on a
+ * schedule without the operator re-uploading ("painkiller"). Per opted-in org:
+ *
+ *   1. SYNC   — pull connected lead sources and ingest fresh leads (incremental),
+ *   2. DRAFT  — auto-generate drafts for fresh NEW leads (QUEUED for approval),
+ *   3. SEND   — send drafts a human ALREADY approved.
+ *
+ * Every capability is opt-in (Org.autopilot*) and default-off. Three rails are
+ * never bypassed for speed: ingest still runs the prior-contact + suppression +
+ * verification gate; drafting still runs the contactability gate; sending still
+ * runs the full send pipeline (caps, warmup, domain auth) and only ever sends
+ * drafts a human approved. Autopilot automates the clicks, not the judgment.
+ */
+
+// Bound LLM spend per run so one big sync can't fan out into a huge drafting bill.
+export const AUTO_DRAFT_BATCH = 25;
+
+export interface AutopilotRunResult {
+  orgId: string;
+  synced: number; // fresh leads ingested from connected sources
+  drafted: number; // fresh leads auto-drafted (queued for approval)
+  skippedDrafts: number; // leads a draft guard refused (opted-out, suppressed, terminal)
+  sent: number; // approved drafts sent
+}
+
+export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunResult> {
+  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, skippedDrafts: 0, sent: 0 };
+
+  const org = await prisma.org.findUnique({
+    where: { id: orgId },
+    select: { id: true, name: true, brandName: true, autopilotSync: true, autopilotDraft: true, autopilotSend: true },
+  });
+  if (!org) return result;
+
+  // (1) SYNC — pull each connected source and run the SAME ingest pipeline as a
+  // manual import. Enabling autopilotSync is the standing prior-contact
+  // attestation for the connected sources (the operator attested when wiring
+  // them up; the toggle re-affirms it). One failing source never blocks others.
+  if (org.autopilotSync) {
+    const conns = await prisma.leadSourceConnection.findMany({
+      where: { orgId, status: "CONNECTED", provider: { not: "CSV" } },
+    });
+    for (const conn of conns) {
+      try {
+        const { leads } = await pullFromSource(conn);
+        if (leads.length === 0) continue;
+        const res = await ingestLeads(leads, {
+          orgId,
+          name: `${conn.provider} autosync`,
+          source: conn.provider.toLowerCase(),
+          consentBasis: "PRIOR_INQUIRY",
+          priorContactAttested: true,
+        });
+        if (res.ok) {
+          result.synced += res.imported;
+          await prisma.leadSourceConnection.update({
+            where: { id: conn.id },
+            data: { lastSyncAt: new Date(), lastImported: res.imported },
+          });
+        }
+      } catch {
+        /* one bad source never blocks the others */
+      }
+    }
+  }
+
+  // (2) DRAFT — auto-generate for the oldest fresh leads, bounded per run. Drafts
+  // land in PENDING_APPROVAL; nothing is sent here. The contactability gate
+  // inside generateDraftsForLead refuses opted-out / suppressed / terminal leads.
+  if (org.autopilotDraft) {
+    const fresh = await prisma.lead.findMany({
+      where: { orgId, status: "NEW" },
+      orderBy: { createdAt: "asc" },
+      take: AUTO_DRAFT_BATCH,
+      select: { id: true },
+    });
+    const operatorName = org.brandName || org.name || "the team";
+    for (const lead of fresh) {
+      try {
+        await generateDraftsForLead({ orgId, leadId: lead.id, operatorName });
+        result.drafted += 1;
+      } catch (e) {
+        if (e instanceof DraftGuardError) result.skippedDrafts += 1;
+        else throw e;
+      }
+    }
+  }
+
+  // (3) SEND — only drafts a human already APPROVED. sendAllApproved enforces
+  // every send rail (suppression, daily/hourly caps, warmup ramp, domain auth,
+  // circuit breaker). This collapses time-to-first-touch without ever sending an
+  // unreviewed email.
+  if (org.autopilotSend) {
+    const res = await sendAllApproved(orgId);
+    result.sent = res.sent;
+  }
+
+  return result;
+}
