@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server";
  * each protected server component. This keeps unauthenticated users out of the
  * app shell without pulling the full auth stack into the Edge runtime.
  */
-const PROTECTED_PREFIXES = ["/leads", "/conversations", "/agent", "/connections", "/deliverability", "/clients"];
+const PROTECTED_PREFIXES = ["/welcome", "/leads", "/conversations", "/agent", "/connections", "/deliverability", "/clients"];
 const APP_HOME = "/"; // Command Center
 
 export function middleware(req: NextRequest) {

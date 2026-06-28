@@ -12,7 +12,27 @@
       "mcp__Vercel__get_runtime_errors",
       "mcp__Vercel__web_fetch_vercel_url",
       "mcp__Vercel__get_access_to_vercel_url",
-      "mcp__Vercel__search_vercel_documentation"
+      "mcp__Vercel__search_vercel_documentation",
+      "mcp__Neon_Tech__list_projects",
+      "mcp__Neon_Tech__get_database_tables",
+      "mcp__Neon_Tech__describe_branch",
+      "mcp__Neon_Tech__describe_table_schema",
+      "mcp__Neon_Tech__list_branch_computes",
+      "mcp__Neon_Tech__explain_sql_statement",
+      "mcp__Neon_Tech__list_slow_queries",
+      "mcp__github__pull_request_read",
+      "mcp__github__list_pull_requests",
+      "mcp__github__actions_list",
+      "mcp__github__actions_get",
+      "mcp__Neon_Tech__run_sql",
+      "mcp__Neon_Tech__run_sql_transaction",
+      "mcp__Neon_Tech__get_connection_string",
+      "mcp__github__create_pull_request",
+      "mcp__github__merge_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__github__create_or_update_file",
+      "mcp__github__push_files",
+      "mcp__github__actions_run_trigger"
     ]
   }
 }

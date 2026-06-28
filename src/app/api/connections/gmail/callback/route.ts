@@ -17,14 +17,17 @@ export async function GET(req: NextRequest) {
   if (!code || !stateRaw) return NextResponse.redirect(new URL("/connections?error=missing_code", base));
 
   let orgId: string;
+  let dest = "/connections";
   try {
-    orgId = JSON.parse(Buffer.from(stateRaw, "base64url").toString()).orgId;
+    const state = JSON.parse(Buffer.from(stateRaw, "base64url").toString());
+    orgId = state.orgId;
+    if (state.ret === "welcome") dest = "/welcome";
   } catch {
     return NextResponse.redirect(new URL("/connections?error=bad_state", base));
   }
   // The state's org must match the active session org (CSRF/replay guard).
   if (orgId !== session.user.activeOrgId) {
-    return NextResponse.redirect(new URL("/connections?error=org_mismatch", base));
+    return NextResponse.redirect(new URL(`${dest}?error=org_mismatch`, base));
   }
 
   try {
@@ -47,8 +50,8 @@ export async function GET(req: NextRequest) {
         tokenExpiry: tokens.expiry,
       },
     });
-    return NextResponse.redirect(new URL("/connections?connected=gmail", base));
+    return NextResponse.redirect(new URL(`${dest}?connected=gmail`, base));
   } catch {
-    return NextResponse.redirect(new URL("/connections?error=exchange_failed", base));
+    return NextResponse.redirect(new URL(`${dest}?error=exchange_failed`, base));
   }
 }

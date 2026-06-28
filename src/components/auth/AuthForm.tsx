@@ -14,12 +14,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [state, formAction, pending] = useActionState(action, initial);
 
   // On success, the server action established the session cookie; navigate in.
+  // New sign-ups land in the focused setup wizard (connect email + calendar);
+  // returning sign-ins go straight to the ready dashboard.
   useEffect(() => {
     if (state.ok) {
-      router.push("/");
+      router.push(mode === "sign-up" ? "/welcome" : "/");
       router.refresh();
     }
-  }, [state.ok, router]);
+  }, [state.ok, router, mode]);
 
   return (
     <div className="w-full max-w-[400px]">
