@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [claude/warm-sweep-saas-build-okf3t6]
+
+jobs:
+  test:
+    name: typecheck + tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # pgvector image — the schema enables the `vector` extension (M2 memory).
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: warmsweep_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/warmsweep_test?schema=public
+      AUTH_SECRET: ci-not-a-real-secret
+      AUTH_TRUST_HOST: "true"
+      # No ANTHROPIC/VOYAGE keys → the app uses its deterministic offline stubs.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate an ephemeral 32-byte encryption key
+        run: echo "ENCRYPTION_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
