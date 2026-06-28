@@ -10,7 +10,16 @@
       "mcp__Vercel__get_deployment_build_logs",
       "mcp__Vercel__web_fetch_vercel_url",
       "mcp__Vercel__get_access_to_vercel_url",
-      "mcp__Vercel__search_vercel_documentation"
+      "mcp__Vercel__search_vercel_documentation",
+      "mcp__Vercel__get_runtime_logs",
+      "mcp__Vercel__get_runtime_errors",
+      "mcp__Neon_Tech__list_projects",
+      "mcp__Neon_Tech__describe_project",
+      "mcp__Neon_Tech__get_database_tables",
+      "mcp__Neon_Tech__describe_table_schema",
+      "mcp__Neon_Tech__get_connection_string",
+      "mcp__Neon_Tech__run_sql",
+      "mcp__Neon_Tech__run_sql_transaction"
     ]
   }
 }
