@@ -8,6 +8,7 @@ import { FirstRunGuide } from "@/components/magic/FirstRunGuide";
 import { BookingCelebration } from "@/components/magic/BookingCelebration";
 import { MorningBrief } from "@/components/magic/MorningBrief";
 import { GuaranteeTracker } from "@/components/magic/GuaranteeTracker";
+import { ReactivationsChart } from "@/components/dashboard/ReactivationsChart";
 import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
 import { guaranteeStatus } from "@/lib/guarantee";
@@ -29,7 +30,6 @@ export default async function CommandCenter() {
   const [streak, guarantee] = await Promise.all([engagementStreak(ctx.orgId), guaranteeStatus(ctx.orgId)]);
   const today = new Date().toISOString().slice(0, 10); // per-day collapse key for the brief
 
-  const maxBar = Math.max(1, ...chart.map((b) => b.value));
   // Celebrate a booking only while it's fresh (< 48h); the component remembers dismissal.
   const celebrate =
     recentBooking && Date.now() - recentBooking.bookedAt.getTime() < 48 * 3600 * 1000 ? recentBooking : null;
@@ -59,7 +59,7 @@ export default async function CommandCenter() {
 
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">
-          <div className="relative overflow-hidden rounded-xl2 bg-sweep p-[22px] text-white">
+          <div className="relative overflow-hidden rounded-xl2 bg-sweep p-[22px] text-white shadow-card">
             <p className="m-0 mb-3 text-[12.5px] font-medium text-[#bfe6d5]">Recovered this month</p>
             <p className="m-0 mb-2 font-heading text-[34px] font-semibold tracking-[-1px] tabular-nums">
               {formatMoney(kpis.recoveredThisMonthCents)}
@@ -85,7 +85,7 @@ export default async function CommandCenter() {
 
         {/* the agent updated itself — wired to the latest applied insight */}
         {(latestInsight || activity.find((a) => a.kind === "agent")) && (
-          <div className="mb-[22px] overflow-hidden rounded-xl2 bg-charcoal p-[26px] px-7">
+          <div className="mb-[22px] overflow-hidden rounded-xl2 bg-charcoal p-[26px] px-7 shadow-card">
             <div className="mb-4 flex items-center gap-2.5">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5CA98A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />
@@ -122,26 +122,9 @@ export default async function CommandCenter() {
 
         {/* split: chart + activity */}
         <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1.45fr_1fr]">
-          <div className="rounded-xl2 border border-line bg-white p-6">
-            <div className="mb-5 flex items-baseline justify-between">
-              <p className="m-0 font-heading text-[16px] font-semibold text-ink">Reactivations</p>
-              <p className="m-0 text-[12.5px] text-muted-2">last 7 days · calls booked</p>
-            </div>
-            <div className="flex h-[170px] items-end gap-3">
-              {chart.map((b, i) => (
-                <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
-                  <span className="text-[12px] font-semibold text-sweep">{b.value || ""}</span>
-                  <div
-                    className="ws-bar w-full rounded-t-md bg-sweep"
-                    style={{ height: `${Math.max(4, (b.value / maxBar) * 130)}px`, opacity: b.value ? 1 : 0.25 }}
-                  />
-                  <span className="text-[11.5px] text-muted-3">{b.day}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ReactivationsChart bars={chart} />
 
-          <div className="rounded-xl2 border border-line bg-white p-6">
+          <div className="rounded-xl2 border border-line bg-white p-6 shadow-card">
             <p className="m-0 mb-4 font-heading text-[16px] font-semibold text-ink">Live activity</p>
             {activity.length === 0 ? (
               <p className="m-0 text-[13.5px] text-muted">Nothing yet — generate drafts and send to see the feed fill up.</p>
@@ -175,7 +158,7 @@ const DOT: Record<string, string> = {
 
 function KpiCard({ label, value, sub, accent }: { label: string; value: number | string; sub: string; accent?: boolean }) {
   return (
-    <div className="rounded-xl2 border border-line bg-white p-[22px]">
+    <div className="rounded-xl2 border border-line bg-white p-[22px] shadow-card">
       <p className="m-0 mb-3 text-[12.5px] font-medium text-[#888780]">{label}</p>
       <p className="m-0 mb-2 font-heading text-[34px] font-semibold tracking-[-1px] text-ink tabular-nums">{value}</p>
       <p className={`m-0 text-[12.5px] ${accent ? "font-medium text-ember" : "text-[#888780]"}`}>{sub}</p>
