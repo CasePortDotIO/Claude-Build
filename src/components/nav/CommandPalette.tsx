@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { Kbd } from "@/components/ui/Kbd";
 
 /**
  * Global ⌘K / Ctrl+K command palette — instant fuzzy navigation + key actions,
@@ -112,7 +113,7 @@ export function CommandPalette({ isAgencyAdmin = false }: { isAgencyAdmin?: bool
             placeholder="Search pages and actions…"
             className="w-full bg-transparent py-3.5 text-[14.5px] text-ink outline-none placeholder:text-muted-3"
           />
-          <kbd className="flex-none rounded border border-line-3 px-1.5 py-0.5 text-[10px] font-semibold text-muted-3">ESC</kbd>
+          <span className="flex-none"><Kbd>ESC</Kbd></span>
         </div>
 
         <div className="ws-scroll max-h-[52vh] overflow-y-auto p-2">
@@ -143,9 +144,9 @@ export function CommandPalette({ isAgencyAdmin = false }: { isAgencyAdmin?: bool
         </div>
 
         <div className="flex items-center gap-4 border-t border-line-2 px-4 py-2 text-[11px] text-muted-3">
-          <span><kbd className="font-sans">↑↓</kbd> navigate</span>
-          <span><kbd className="font-sans">↵</kbd> open</span>
-          <span className="ml-auto"><kbd className="font-sans">⌘K</kbd> anytime</span>
+          <span className="flex items-center gap-1"><Kbd>↑↓</Kbd> navigate</span>
+          <span className="flex items-center gap-1"><Kbd>↵</Kbd> open</span>
+          <span className="ml-auto flex items-center gap-1"><Kbd>⌘K</Kbd> anytime</span>
         </div>
       </div>
     </div>
