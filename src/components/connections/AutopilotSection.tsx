@@ -54,7 +54,7 @@ export function AutopilotSection({ initial }: { initial: AutopilotState }) {
   return (
     <div className="mb-7">
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Autopilot</p>
-      <div className="rounded-xl2 border border-line bg-white">
+      <div className="rounded-xl2 border border-line bg-white shadow-card">
         {ROWS.map((row, i) => (
           <div key={row.key} className={`flex items-start gap-3.5 p-4 ${i > 0 ? "border-t border-line-2" : ""}`}>
             <div className="min-w-0 flex-1">

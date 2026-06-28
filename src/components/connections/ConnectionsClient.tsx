@@ -149,7 +149,7 @@ export function ConnectionsClient({
           <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Link-based</span>
         </Card>
       </div>
-      <div className="mb-7 rounded-xl2 border border-line bg-white p-4">
+      <div className="mb-7 rounded-xl2 border border-line bg-white p-4 shadow-card">
         <p className="m-0 mb-2 text-[12.5px] font-semibold text-ink">Booking link fallback</p>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -170,7 +170,7 @@ export function ConnectionsClient({
       </div>
 
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Notifications</p>
-      <div className="mb-7 rounded-xl2 border border-line bg-white p-4">
+      <div className="mb-7 rounded-xl2 border border-line bg-white p-4 shadow-card">
         <p className="m-0 mb-2 text-[12.5px] font-semibold text-ink">
           Slack — ping you the moment a call books {slackConfigured && <span className="text-sweep">· connected</span>}
         </p>
@@ -188,7 +188,7 @@ export function ConnectionsClient({
       </div>
 
       {connected.length > 0 && (
-        <div className="rounded-xl2 border border-line bg-white p-5">
+        <div className="rounded-xl2 border border-line bg-white p-5 shadow-card">
           <p className="m-0 mb-3 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Daily send caps</p>
           {connected.map((m) => (
             <div key={m.id} className="flex items-center justify-between border-b border-line-2 py-2 last:border-b-0">
@@ -225,7 +225,7 @@ function Card({
 }) {
   const on = status === "Connected";
   return (
-    <div className="flex items-center gap-3.5 rounded-xl2 border border-line bg-white px-4 py-4">
+    <div className="flex items-center gap-3.5 rounded-xl2 border border-line bg-white px-4 py-4 shadow-card transition-shadow hover:shadow-pop">
       <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[10px] font-heading text-[14px] font-semibold text-white" style={{ background: monoBg }}>
         {mono}
       </div>

@@ -74,7 +74,7 @@ export function DeliverabilityClient({
       )}
 
       {/* mailbox caps + warmup */}
-      <div className="rounded-xl2 border border-line bg-white p-5">
+      <div className="rounded-xl2 border border-line bg-white p-5 shadow-card">
         <p className="m-0 mb-3 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Sending mailboxes</p>
         {mailboxes.length === 0 ? (
           <p className="m-0 text-[13.5px] text-muted">No mailbox connected yet.</p>
@@ -119,7 +119,7 @@ export function DeliverabilityClient({
       </div>
 
       {/* suppression list */}
-      <div className="rounded-xl2 border border-line bg-white p-5">
+      <div className="rounded-xl2 border border-line bg-white p-5 shadow-card">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="m-0 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">
             Suppression list · {suppressionCount}

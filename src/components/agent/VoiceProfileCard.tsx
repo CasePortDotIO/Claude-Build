@@ -65,7 +65,7 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
   }
 
   return (
-    <div className="rounded-xl2 border border-line bg-white p-7">
+    <div className="rounded-xl2 border border-line bg-white p-7 shadow-card">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <p className="m-0 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Your voice profile</p>

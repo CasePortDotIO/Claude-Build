@@ -54,7 +54,7 @@ export function LeadSourcesSection({ connected }: { connected: ConnectedSource[]
           const isConnected = conn?.status === "CONNECTED";
           const isOpen = open === s.provider;
           return (
-            <div key={s.provider} className="rounded-xl2 border border-line bg-white p-4">
+            <div key={s.provider} className="rounded-xl2 border border-line bg-white p-4 shadow-card transition-shadow hover:shadow-pop">
               <div className="flex items-center gap-3.5">
                 <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[10px] font-heading text-[13.5px] font-semibold text-white" style={{ background: s.color }}>
                   {s.mono}
