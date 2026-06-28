@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { pullFromSource } from "@/lib/leadsource";
 import { ingestLeads } from "@/lib/import/ingest";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
+import { runFollowupsForOrg } from "@/lib/agent/followup";
 import { sendAllApproved } from "@/lib/agent/send";
 
 /**
@@ -28,11 +29,13 @@ export interface AutopilotRunResult {
   synced: number; // fresh leads ingested from connected sources
   drafted: number; // fresh leads auto-drafted (queued for approval)
   skippedDrafts: number; // leads a draft guard refused (opted-out, suppressed, terminal)
+  followedUp: number; // follow-up drafts queued for leads that went quiet
+  closedOut: number; // leads closed after exhausting their follow-up touches
   sent: number; // approved drafts sent
 }
 
 export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunResult> {
-  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, skippedDrafts: 0, sent: 0 };
+  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, skippedDrafts: 0, followedUp: 0, closedOut: 0, sent: 0 };
 
   const org = await prisma.org.findUnique({
     where: { id: orgId },
@@ -92,6 +95,17 @@ export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunRes
         else throw e;
       }
     }
+  }
+
+  // (2b) FOLLOW-UP — multi-touch nudges for leads that were sent but went quiet.
+  // Same approval gate as drafting (follow-ups land PENDING_APPROVAL, never sent
+  // here), same contactability gate, and the configured gap is honoured. Most
+  // reactivations land on touch 2–3, so this is where much of the recovery comes
+  // from. Gated under autopilotDraft since it produces approval-queued drafts.
+  if (org.autopilotDraft) {
+    const fu = await runFollowupsForOrg(orgId);
+    result.followedUp = fu.generated;
+    result.closedOut = fu.closed;
   }
 
   // (3) SEND — only drafts a human already APPROVED. sendAllApproved enforces

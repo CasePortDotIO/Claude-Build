@@ -60,6 +60,13 @@ export function buildDraftSystemPrompt(input: DraftInput): string {
     input.promotedOpeners && input.promotedOpeners.length
       ? `\nFavor this opening style — it books the most calls in your data: ${input.promotedOpeners.map((p) => `"${p}"`).join(", ")}. Lead with it when it fits the lead's goal.`
       : "",
+    input.followUp
+      ? `\nFOLLOW-UP — this is touch #${input.followUp.touch} to a prior email they didn't answer${input.followUp.previousSubject ? ` (last subject: "${input.followUp.previousSubject}")` : ""}. Assume your last note simply slipped past a busy inbox — NEVER guilt them ("just following up again", "did you see this?"). Keep it SHORTER than the first and bring a genuinely fresh angle or one concrete reason it's worth 15 minutes now — don't merely "bump this to the top".${
+          input.followUp.isFinal
+            ? ` This is the FINAL touch — write a gracious breakup: low-key, zero pressure, e.g. "I'll assume the timing isn't right and close your file — just say the word if that ever changes." Honest breakup notes often earn the reply the others didn't.`
+            : ""
+        }`
+      : "",
     ``,
     `Return ${input.variantCount} distinct variants via the submit_drafts tool,`,
     `each a different angle, each with a calibrated confidence (0–1) reflecting how`,
