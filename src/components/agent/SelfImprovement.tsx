@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { runReflectionAction, applyInsightAction, vetoInsightAction } from "@/server/actions/reflection";
+import { toastResult } from "@/components/ui/Toast";
 
 export interface InsightVM {
   id: string;
@@ -34,14 +35,11 @@ export function SelfImprovement({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
 
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const r = await fn();
-      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Error");
+      toastResult(await fn());
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
@@ -80,8 +78,6 @@ export function SelfImprovement({
           </p>
         )}
       </div>
-
-      {msg && <div className="rounded-lg bg-sweep-mist px-3 py-2 text-[13px] text-sweep">{msg}</div>}
 
       {/* proposed insights (apply/veto) */}
       {proposed.length > 0 && (

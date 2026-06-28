@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendDraftAction, sendAllApprovedAction } from "@/server/actions/mailbox";
+import { toastResult } from "@/components/ui/Toast";
 
 export interface ReadyItem {
   draftId: string;
@@ -13,16 +14,13 @@ export interface ReadyItem {
 export function ReadyToSend({ items, hasMailbox }: { items: ReadyItem[]; hasMailbox: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
 
   if (items.length === 0) return null;
 
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const r = await fn();
-      setMsg(r.ok ? r.message ?? "Sent" : r.error ?? "Error");
+      toastResult(await fn(), "Sent");
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
@@ -64,7 +62,6 @@ export function ReadyToSend({ items, hasMailbox }: { items: ReadyItem[]; hasMail
           </div>
         ))}
       </div>
-      {msg && <p className="m-0 mt-2 text-[12.5px] text-sweep">{msg}</p>}
     </div>
   );
 }

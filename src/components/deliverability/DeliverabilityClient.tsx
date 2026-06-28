@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { suppressEmailAction, resumeMailboxAction, setMailingAddressAction } from "@/server/actions/compliance";
 import { rescrubAndResumeAction } from "@/server/actions/mailbox";
+import { toastResult } from "@/components/ui/Toast";
 
 export interface MailboxHealthVM {
   id: string;
@@ -43,21 +44,16 @@ export function DeliverabilityClient({
   const [pending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [addr, setAddr] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
 
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const r = await fn();
-      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Error");
+      toastResult(await fn());
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
   return (
     <div className="space-y-4">
-      {msg && <div className="rounded-lg bg-sweep-mist px-3 py-2 text-[13px] text-sweep">{msg}</div>}
-
       {!hasMailingAddress && (
         <div className="rounded-xl2 border border-[#f0dcc9] bg-[#FBF3EC] p-4">
           <p className="m-0 mb-2 text-[13.5px] font-semibold text-[#7a5a44]">

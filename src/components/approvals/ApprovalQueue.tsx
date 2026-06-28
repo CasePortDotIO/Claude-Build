@@ -7,6 +7,7 @@ import {
   rejectDraftAction,
   approveAllAction,
 } from "@/server/actions/agent";
+import { toast } from "@/components/ui/Toast";
 
 export interface VariantVM {
   id: string;
@@ -34,7 +35,6 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activeId, setActiveId] = useState<string | null>(drafts[0]?.id ?? null);
-  const [toast, setToast] = useState<string | null>(null);
 
   if (drafts.length === 0) {
     return (
@@ -50,9 +50,8 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
   const active = drafts.find((d) => d.id === activeId) ?? drafts[0];
 
   function refresh(msg: string) {
-    setToast(msg);
+    toast(msg);
     router.refresh();
-    setTimeout(() => setToast(null), 3500);
   }
 
   return (
@@ -105,11 +104,6 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
         }
       />
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl2 border border-[#2a3f36] bg-charcoal px-5 py-3 text-[13.5px] font-medium text-white shadow-xl">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

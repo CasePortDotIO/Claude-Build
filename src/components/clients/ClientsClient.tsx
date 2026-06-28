@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClientAction, updateClientBrandingAction, switchOrgAction } from "@/server/actions/org";
+import { toastResult } from "@/components/ui/Toast";
 
 export interface ClientVM {
   orgId: string;
@@ -25,7 +26,6 @@ function initials(name: string) {
 export function ClientsClient({ clients }: { clients: ClientVM[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -35,17 +35,14 @@ export function ClientsClient({ clients }: { clients: ClientVM[] }) {
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>, after?: () => void) {
     startTransition(async () => {
       const r = await fn();
-      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Error");
+      toastResult(r);
       if (r.ok) after?.();
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
   return (
     <div>
-      {msg && <div className="mb-4 rounded-lg bg-sweep-mist px-3 py-2 text-[13px] text-sweep">{msg}</div>}
-
       <div className="mb-4 flex items-center justify-between">
         <p className="m-0 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Your clients · {clients.length}</p>
         <button onClick={() => setAdding((v) => !v)} className="rounded-lg bg-ember px-4 py-2 font-heading text-[13px] font-semibold text-white hover:bg-ember-hover">

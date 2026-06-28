@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { learnVoiceAction, editVoiceProfileAction } from "@/server/actions/agent";
+import { toast, toastResult } from "@/components/ui/Toast";
 
 export interface VoiceVM {
   tone: string;
@@ -31,7 +32,6 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
   const [mode, setMode] = useState<"view" | "edit" | "learn">("view");
   const [draft, setDraft] = useState(voice);
   const [samples, setSamples] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
 
   function save() {
     startTransition(async () => {
@@ -44,7 +44,7 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
         signatureMove: draft.signatureMove,
         summary: draft.summary ?? undefined,
       });
-      setMsg(r.ok ? r.message ?? "Saved" : r.error ?? "Error");
+      toastResult(r, "Saved");
       if (r.ok) { setMode("view"); router.refresh(); }
     });
   }
@@ -56,10 +56,10 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
       .map((b) => b.trim())
       .filter(Boolean)
       .map((body) => ({ body }));
-    if (blocks.length === 0) { setMsg("Paste at least one email."); return; }
+    if (blocks.length === 0) { toast("Paste at least one email.", "error"); return; }
     startTransition(async () => {
       const r = await learnVoiceAction({ samples: blocks });
-      setMsg(r.ok ? r.message ?? "Learned" : r.error ?? "Error");
+      toastResult(r, "Learned");
       if (r.ok) { setMode("view"); setSamples(""); router.refresh(); }
     });
   }
@@ -84,8 +84,6 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
           </button>
         </div>
       </div>
-
-      {msg && <div className="mb-4 rounded-lg bg-sweep-mist px-3 py-2 text-[12.5px] text-sweep">{msg}</div>}
 
       {mode === "learn" ? (
         <div>
