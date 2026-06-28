@@ -49,7 +49,7 @@ export function SelfImprovement({
   return (
     <div className="space-y-[18px]">
       {/* A/B holdout card */}
-      <div className="rounded-xl2 border border-line bg-white p-7">
+      <div className="rounded-xl2 border border-line bg-white p-7 shadow-card">
         <div className="mb-4 flex items-center justify-between gap-3">
           <p className="m-0 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">A/B holdout — measured, not asserted</p>
           <button
@@ -81,7 +81,7 @@ export function SelfImprovement({
 
       {/* proposed insights (apply/veto) */}
       {proposed.length > 0 && (
-        <div className="rounded-xl2 border border-[rgba(232,116,59,0.3)] bg-[#FBF3EC] p-7">
+        <div className="rounded-xl2 border border-[rgba(232,116,59,0.3)] bg-[#FBF3EC] p-7 shadow-card">
           <p className="m-0 mb-4 text-[12px] font-semibold uppercase tracking-[1.6px] text-[#9a6a44]">
             Proposed changes · your call
           </p>
@@ -110,7 +110,7 @@ export function SelfImprovement({
       )}
 
       {/* what it taught itself (applied/vetoed log) */}
-      <div className="rounded-xl2 border border-line bg-white p-7">
+      <div className="rounded-xl2 border border-line bg-white p-7 shadow-card">
         <div className="mb-5 flex items-center justify-between gap-3">
           <p className="m-0 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">What it taught itself</p>
           <div className="flex items-center gap-3 text-[12px] text-muted-3">
