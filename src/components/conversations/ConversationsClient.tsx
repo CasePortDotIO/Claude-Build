@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { simulateReplyAction } from "@/server/actions/mailbox";
 import { getAvailabilityAction, bookCallAction } from "@/server/actions/calendar";
+import { toast, toastResult } from "@/components/ui/Toast";
 
 export interface ThreadMessage {
   id: string;
@@ -42,7 +43,6 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activeId, setActiveId] = useState<string | null>(conversations[0]?.id ?? null);
-  const [msg, setMsg] = useState<string | null>(null);
 
   if (conversations.length === 0) {
     return (
@@ -59,10 +59,8 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
 
   function simulate(kind: "positive" | "optout" | "bounce") {
     startTransition(async () => {
-      const r = await simulateReplyAction({ leadId: active.leadId, kind });
-      setMsg(r.ok ? r.message ?? "Reply ingested" : r.error ?? "Error");
+      toastResult(await simulateReplyAction({ leadId: active.leadId, kind }), "Reply ingested");
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
@@ -161,13 +159,12 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
                 </Link>
               </div>
             )}
-            <BookControl leadId={active.leadId} pending={pending} startTransition={startTransition} onDone={(m) => { setMsg(m); router.refresh(); setTimeout(() => setMsg(null), 4000); }} />
+            <BookControl leadId={active.leadId} pending={pending} startTransition={startTransition} onDone={(m) => { toast(m); router.refresh(); }} />
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[12.5px] text-muted-2">Demo the reply loop:</span>
               <SimBtn disabled={pending} onClick={() => simulate("positive")}>Positive reply</SimBtn>
               <SimBtn disabled={pending} onClick={() => simulate("optout")}>Opt-out</SimBtn>
               <SimBtn disabled={pending} onClick={() => simulate("bounce")}>Bounce</SimBtn>
-              {msg && <span className="text-[12px] text-sweep">{msg}</span>}
             </div>
           </div>
         )}

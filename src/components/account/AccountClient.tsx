@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelSubscriptionAction, reactivateSubscriptionAction } from "@/server/actions/account";
+import { toastResult } from "@/components/ui/Toast";
 
 /**
  * §9 self-serve account controls. Cancellation is one click, with a single plain
@@ -22,12 +23,10 @@ export function AccountClient({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const r = await fn();
-      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Something went wrong");
+      toastResult(await fn());
       setConfirming(false);
       router.refresh();
     });
@@ -45,10 +44,6 @@ export function AccountClient({
           </span>
         </p>
       </div>
-
-      {msg && (
-        <div className="rounded-lg border border-[rgba(27,122,87,0.2)] bg-sweep-mist px-4 py-3 text-[13.5px] text-sweep">{msg}</div>
-      )}
 
       {canceled ? (
         <div className="rounded-xl2 border border-line bg-white p-6">

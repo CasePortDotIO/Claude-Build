@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { LEAD_STATUS_META } from "@/lib/types";
 import { generateDraftsAction } from "@/server/actions/agent";
 import { eraseLeadAction } from "@/server/actions/compliance";
+import { toast, toastResult } from "@/components/ui/Toast";
 import type { LeadStatus } from "@prisma/client";
 
 // Serializable shape passed from the server page (no Date objects).
@@ -61,7 +62,6 @@ export function LeadsView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(leads[0]?.id ?? null);
-  const [msg, setMsg] = useState<string | null>(null);
   const selected = leads.find((l) => l.id === selectedId) ?? null;
 
   const draftableIds = leads.filter((l) => ELIGIBLE.has(l.status) && !drafts[l.id]).map((l) => l.id);
@@ -70,9 +70,11 @@ export function LeadsView({
     if (ids.length === 0) return;
     startTransition(async () => {
       const r = await generateDraftsAction({ leadIds: ids, variantCount: 3 });
-      setMsg(r.ok ? `Drafted ${r.generated}, skipped ${r.skipped?.length ?? 0}.` : r.error ?? "Error");
+      toast(
+        r.ok ? `Drafted ${r.generated}, skipped ${r.skipped?.length ?? 0}.` : r.error ?? "Couldn't generate drafts",
+        r.ok ? "success" : "error",
+      );
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
@@ -99,7 +101,6 @@ export function LeadsView({
         <Link href="/approvals" className="text-[13px] font-semibold text-sweep hover:underline">
           Review approvals →
         </Link>
-        {msg && <span className="text-[12.5px] text-muted">{msg}</span>}
       </div>
 
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[1.5fr_1fr]">
@@ -186,11 +187,9 @@ export function LeadsView({
                   onClick={() => {
                     if (!confirm(`Permanently erase ${fullName(selected)} and all their data? Their email stays on do-not-contact.`)) return;
                     startTransition(async () => {
-                      const r = await eraseLeadAction(selected.id);
-                      setMsg(r.ok ? r.message ?? "Erased" : r.error ?? "Error");
+                      toastResult(await eraseLeadAction(selected.id), "Erased");
                       setSelectedId(null);
                       router.refresh();
-                      setTimeout(() => setMsg(null), 4000);
                     });
                   }}
                   className="text-[12px] font-semibold text-[#e08b8b] hover:underline disabled:opacity-60"

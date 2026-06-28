@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setAutopilotAction } from "@/server/actions/autopilot";
+import { toast } from "@/components/ui/Toast";
 
 export interface AutopilotState {
   sync: boolean;
@@ -32,7 +33,6 @@ export function AutopilotSection({ initial }: { initial: AutopilotState }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [state, setState] = useState<AutopilotState>(initial);
-  const [msg, setMsg] = useState<string | null>(null);
 
   function toggle(key: keyof AutopilotState) {
     const next = !state[key];
@@ -43,19 +43,17 @@ export function AutopilotSection({ initial }: { initial: AutopilotState }) {
       const r = await setAutopilotAction(payload);
       if (!r.ok) {
         setState((s) => ({ ...s, [key]: !next })); // revert on failure
-        setMsg(r.error ?? "Couldn't update autopilot.");
+        toast(r.error ?? "Couldn't update autopilot.", "error");
       } else {
-        setMsg(next ? "Turned on." : "Turned off.");
+        toast(next ? "Turned on." : "Turned off.");
       }
       router.refresh();
-      setTimeout(() => setMsg(null), 4000);
     });
   }
 
   return (
     <div className="mb-7">
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Autopilot</p>
-      {msg && <div className="mb-3 rounded-lg bg-sweep-mist px-3 py-2 text-[13px] text-sweep">{msg}</div>}
       <div className="rounded-xl2 border border-line bg-white">
         {ROWS.map((row, i) => (
           <div key={row.key} className={`flex items-start gap-3.5 p-4 ${i > 0 ? "border-t border-line-2" : ""}`}>

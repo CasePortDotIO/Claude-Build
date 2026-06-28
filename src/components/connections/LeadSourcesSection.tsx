@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { connectLeadSourceAction, disconnectLeadSourceAction, importFromSourceAction } from "@/server/actions/leadsource";
 import type { LeadSourceKind } from "@prisma/client";
+import { toastResult } from "@/components/ui/Toast";
 
 interface SourceDef {
   provider: LeadSourceKind;
@@ -34,23 +35,19 @@ export function LeadSourcesSection({ connected }: { connected: ConnectedSource[]
   const [open, setOpen] = useState<LeadSourceKind | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [config, setConfig] = useState<Record<string, string>>({});
-  const [msg, setMsg] = useState<string | null>(null);
 
   const byProvider = new Map(connected.map((c) => [c.provider, c]));
 
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const r = await fn();
-      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Error");
+      toastResult(await fn());
       router.refresh();
-      setTimeout(() => setMsg(null), 5000);
     });
   }
 
   return (
     <div className="mb-7">
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Lead sources</p>
-      {msg && <div className="mb-3 rounded-lg bg-sweep-mist px-3 py-2 text-[13px] text-sweep">{msg}</div>}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         {SOURCES.map((s) => {
           const conn = byProvider.get(s.provider);

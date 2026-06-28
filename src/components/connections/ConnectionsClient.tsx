@@ -8,6 +8,7 @@ import {
   setBookingLinkAction,
   setSlackWebhookAction,
 } from "@/server/actions/calendar";
+import { toastResult } from "@/components/ui/Toast";
 
 export interface MailboxVM {
   id: string;
@@ -41,7 +42,6 @@ export function ConnectionsClient({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
   const [link, setLink] = useState(calendar?.bookingLink ?? "");
   const [slack, setSlack] = useState("");
 
@@ -50,8 +50,7 @@ export function ConnectionsClient({
 
   function run(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const r = await fn();
-      setMsg(r.ok ? r.message ?? "Done" : r.error ?? "Error");
+      toastResult(await fn());
       router.refresh();
     });
   }
@@ -70,8 +69,6 @@ export function ConnectionsClient({
           {connected.length} connected
         </span>
       </div>
-
-      {msg && <div className="mb-4 rounded-lg bg-sweep-mist px-3 py-2 text-[13px] text-sweep">{msg}</div>}
 
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Sending mailbox</p>
       <div className="mb-7 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -117,7 +114,7 @@ export function ConnectionsClient({
               onClick={() =>
                 startTransition(async () => {
                   const sim = mailboxes.find((m) => m.provider === "SIMULATION");
-                  if (sim) { const r = await disconnectMailboxAction(sim.id); setMsg(r.message ?? ""); router.refresh(); }
+                  if (sim) { toastResult(await disconnectMailboxAction(sim.id)); router.refresh(); }
                 })
               }
               className="rounded-lg border border-line-3 bg-white px-4 py-2 text-[13px] font-semibold text-muted hover:bg-cream"
@@ -127,7 +124,7 @@ export function ConnectionsClient({
           ) : (
             <button
               disabled={pending}
-              onClick={() => startTransition(async () => { const r = await connectSimulationMailboxAction(); setMsg(r.message ?? ""); router.refresh(); })}
+              onClick={() => startTransition(async () => { toastResult(await connectSimulationMailboxAction()); router.refresh(); })}
               className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
             >
               {pending ? "Connecting…" : "Connect"}
