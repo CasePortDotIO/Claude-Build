@@ -80,3 +80,46 @@ export async function notifyBooking(opts: {
     return { slack: false };
   }
 }
+
+/**
+ * The first "someone replied" is the emotional win that decides week-one
+ * retention — so surface it the instant it lands, not in tomorrow's digest.
+ * Mirrors notifyBooking: an AuditLog always (so the event is recorded even with
+ * no external channel) plus a best-effort Slack ping. Callers invoke this after
+ * the inbound write commits; a failing webhook never breaks reply ingestion.
+ */
+export async function notifyReply(opts: {
+  orgId: string;
+  leadName: string;
+  snippet: string;
+  needsReview: boolean;
+}): Promise<{ slack: boolean }> {
+  const { orgId, leadName, snippet, needsReview } = opts;
+
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      action: "reply.notify",
+      targetType: "Conversation",
+      metadata: { leadName, needsReview },
+    },
+  });
+
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { slackWebhookEnc: true } });
+  if (!org?.slackWebhookEnc) return { slack: false };
+
+  try {
+    const url = decryptSecret(org.slackWebhookEnc);
+    const clipped = snippet.replace(/\s+/g, " ").trim().slice(0, 140);
+    const more = snippet.replace(/\s+/g, " ").trim().length > 140 ? "…" : "";
+    const text = `*${leadName}* replied${needsReview ? " — needs your review" : ""}: "${clipped}${more}"`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    return { slack: res.ok };
+  } catch {
+    return { slack: false };
+  }
+}

@@ -60,11 +60,14 @@ export default async function CommandCenter() {
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">
           <div className="relative overflow-hidden rounded-xl2 bg-sweep p-[22px] text-white">
-            <p className="m-0 mb-3 text-[12.5px] font-medium text-[#bfe6d5]">Recovered revenue</p>
+            <p className="m-0 mb-3 text-[12.5px] font-medium text-[#bfe6d5]">Recovered this month</p>
             <p className="m-0 mb-2 font-heading text-[34px] font-semibold tracking-[-1px] tabular-nums">
-              {formatMoney(kpis.recoveredRevenueCents)}
+              {formatMoney(kpis.recoveredThisMonthCents)}
             </p>
-            <p className="m-0 text-[12.5px] text-[#bfe6d5]">from {kpis.callsBooked} booked call{kpis.callsBooked === 1 ? "" : "s"}</p>
+            <p className="m-0 text-[12.5px] text-[#bfe6d5]">
+              from {kpis.callsBookedThisMonth} booked call{kpis.callsBookedThisMonth === 1 ? "" : "s"}
+              {kpis.recoveredRevenueCents > kpis.recoveredThisMonthCents ? ` · ${formatMoney(kpis.recoveredRevenueCents)} all-time` : ""}
+            </p>
           </div>
           <KpiCard label="Calls booked" value={kpis.callsBooked} sub={kpis.callsShowed > 0 ? `${kpis.callsShowed} showed` : "agent → calendar"} />
           <KpiCard
