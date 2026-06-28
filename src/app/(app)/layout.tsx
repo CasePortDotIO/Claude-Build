@@ -5,6 +5,7 @@ import { orgScoped } from "@/lib/tenancy";
 import { resolveBranding } from "@/lib/branding";
 import { listMemberships } from "@/server/actions/org";
 import { Sidebar } from "@/components/nav/Sidebar";
+import { CommandPalette } from "@/components/nav/CommandPalette";
 
 // White-label the browser tab too: client users never see "The Warm Sweep".
 export async function generateMetadata(): Promise<Metadata> {
@@ -49,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         isAgencyAdmin={isAgencyAdmin}
       />
       <main className="ws-scroll flex min-w-0 flex-1 flex-col">{children}</main>
+      <CommandPalette isAgencyAdmin={isAgencyAdmin} />
     </div>
   );
 }
