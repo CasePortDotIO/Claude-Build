@@ -31,6 +31,14 @@ export const importRequestSchema = z.object({
 
 export type ImportRequest = z.infer<typeof importRequestSchema>;
 
+// M17 done-for-you: the same import payload, plus the target client workspace.
+// An agency admin imports into a client they own (tenant-checked server-side).
+export const agencyImportRequestSchema = importRequestSchema.extend({
+  clientOrgId: z.string().min(1, "Pick a client workspace"),
+});
+
+export type AgencyImportRequest = z.infer<typeof agencyImportRequestSchema>;
+
 export const leadFilterSchema = z.object({
   status: z.string().optional(),
   q: z.string().trim().max(200).optional(),
