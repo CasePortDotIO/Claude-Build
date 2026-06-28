@@ -36,7 +36,7 @@ export default async function CommandCenter() {
 
   return (
     <>
-      <Topbar title="Command Center" />
+      <Topbar title="Command Center" subtitle="Your reactivation at a glance" />
       <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
         {/* M9: the payoff moment — a fresh booking lands loud */}
         {celebrate && (

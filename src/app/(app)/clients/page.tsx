@@ -29,7 +29,7 @@ export default async function ClientsPage() {
 
   return (
     <>
-      <Topbar title="Clients" />
+      <Topbar title="Clients" subtitle="Your reseller roll-up" />
       <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
         {/* reseller banner */}
         <div className="mb-[22px] flex items-center gap-3 rounded-xl2 border border-[#f0dcc9] bg-[#FBF3EC] px-5 py-3.5">
