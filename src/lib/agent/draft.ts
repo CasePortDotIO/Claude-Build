@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getLLMProvider } from "@/lib/ai/provider";
+import { getLLMProvider, StubProvider } from "@/lib/ai/provider";
 import { retrieveSimilar } from "@/lib/memory";
 import { estimateCostUsd } from "@/lib/ai/config";
 import { defaultVoiceProfile } from "@/lib/agent/voice";
@@ -20,6 +20,23 @@ export function buildOptOutLine(): string {
   // Plain-text opt-out in every email (§5/§9). The CAN-SPAM physical address is
   // appended by the send pipeline in M5; this is the per-message opt-out.
   return "If you'd rather not hear from me, just reply 'stop' and I won't reach out again.";
+}
+
+// Retrieve semantic memory, but never let an embedding/retrieval failure abort
+// the whole draft run — these results are optional context, so on error we log
+// and continue with none.
+async function safeRetrieve(
+  opts: Parameters<typeof retrieveSimilar>[0],
+): ReturnType<typeof retrieveSimilar> {
+  try {
+    return await retrieveSimilar(opts);
+  } catch (e) {
+    console.error(
+      `[draft] memory retrieval failed (kinds=${opts.kinds?.join(",") ?? "all"}); continuing without it:`,
+      e instanceof Error ? e.message : e,
+    );
+    return [];
+  }
 }
 
 /**
@@ -73,9 +90,12 @@ export async function generateDraftsForLead(opts: {
     .join(" ")
     .trim() || (lead.firstName ?? lead.email);
 
+  // Voice exemplars + objection memory are *enhancements*, not requirements:
+  // if the embedder (e.g. Voyage) is misconfigured or down, drafting must still
+  // proceed grounded in the lead's own fields rather than failing the whole run.
   const [voiceSamples, similarObjections, learning] = await Promise.all([
-    retrieveSimilar({ orgId, query: retrievalQuery, k: 3, kinds: ["VOICE_SAMPLE"] }),
-    retrieveSimilar({ orgId, query: retrievalQuery, k: 3, kinds: ["OBJECTION"] }),
+    safeRetrieve({ orgId, query: retrievalQuery, k: 3, kinds: ["VOICE_SAMPLE"] }),
+    safeRetrieve({ orgId, query: retrievalQuery, k: 3, kinds: ["OBJECTION"] }),
     prisma.orgLearning.findUnique({ where: { orgId } }),
   ]);
 
@@ -105,9 +125,21 @@ export async function generateDraftsForLead(opts: {
     promotedOpeners: learning?.promotedOpeners ?? [],
   };
 
-  // Reason: call the provider (Claude or stub).
+  // Reason: call the provider (Claude or stub). If a keyed provider fails at
+  // request time (bad/expired key, quota, upstream outage), fall back to the
+  // deterministic stub so the operator still gets a sendable, grounded draft
+  // instead of a dead button. The failure is logged for diagnosis.
   const provider = getLLMProvider();
-  const result = await provider.draftReengagement(input);
+  let result;
+  try {
+    result = await provider.draftReengagement(input);
+  } catch (e) {
+    console.error(
+      `[draft] provider "${provider.name}" failed for lead ${leadId}; falling back to stub:`,
+      e instanceof Error ? e.message : e,
+    );
+    result = await new StubProvider().draftReengagement(input);
+  }
 
   // M9: score each variant's voice fidelity against the operator's own past
   // emails — deterministic, no extra model call — so approval can show the proof.
