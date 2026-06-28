@@ -52,6 +52,12 @@ const config: Config = {
       borderRadius: {
         xl2: "14px",
       },
+      // Elevation tokens — three deliberate steps instead of ad-hoc arbitrary shadows.
+      boxShadow: {
+        card: "0 1px 2px rgba(20,18,12,0.04), 0 1px 3px rgba(20,18,12,0.06)",
+        pop: "0 8px 30px -10px rgba(20,18,12,0.25)",
+        lift: "0 16px 48px -16px rgba(20,18,12,0.38)",
+      },
       keyframes: {
         wsPulse: {
           "0%,100%": { opacity: "1", transform: "scale(1)" },
@@ -65,11 +71,22 @@ const config: Config = {
           from: { transform: "scaleY(0)" },
           to: { transform: "scaleY(1)" },
         },
+        // Interaction motion for optimistic triage (approve/reject exits, select pop).
+        wsExit: {
+          from: { opacity: "1", transform: "none", maxHeight: "200px" },
+          to: { opacity: "0", transform: "translateX(36px)", maxHeight: "0px" },
+        },
+        wsPop: {
+          from: { transform: "scale(.985)" },
+          to: { transform: "scale(1)" },
+        },
       },
       animation: {
         wsPulse: "wsPulse 2s ease-in-out infinite",
         wsRise: "wsRise .5s ease both",
         wsGrow: "wsGrow .8s cubic-bezier(.2,.8,.3,1) both",
+        wsExit: "wsExit .3s cubic-bezier(.4,0,1,1) both",
+        wsPop: "wsPop .14s ease-out both",
       },
     },
   },

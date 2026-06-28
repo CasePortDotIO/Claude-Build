@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { switchOrgAction } from "@/server/actions/org";
+import { Kbd } from "@/components/ui/Kbd";
 import type { Branding } from "@/lib/branding";
 
 /**
@@ -163,7 +164,7 @@ export function Sidebar({
             <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
           </svg>
           <span>Quick find</span>
-          <kbd className="ml-auto rounded border border-[#34393f] px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide">⌘K</kbd>
+          <span className="ml-auto"><Kbd dark>⌘K</Kbd></span>
         </button>
         {SECTIONS.map((sec) => {
           const items = nav.filter((i) => i.section === sec.key);
