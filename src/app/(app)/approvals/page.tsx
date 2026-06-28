@@ -57,7 +57,7 @@ export default async function ApprovalsPage() {
   return (
     <>
       <Topbar title="Approvals" subtitle="Review drafts before anything sends" />
-      <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
+      <div className="ws-rise flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         <p className="mb-5 max-w-[640px] text-[14px] leading-[1.6] text-muted">
           Every message waits for you. Edit, switch variants, approve, or reject — nothing leaves your mailbox
           without a click. (v1 default: preview &amp; approve.)

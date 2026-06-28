@@ -76,7 +76,7 @@ export default async function AgentPage() {
   return (
     <>
       <Topbar title="The Agent" subtitle="Your voice and what it's learning" />
-      <div className="ws-rise max-w-[1000px] flex-1 px-[34px] pb-[60px] pt-[30px]">
+      <div className="ws-rise max-w-[1000px] flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         {/* M10: trained-agent maturity score + ROI ledger — the switching cost */}
         <AgentMaturityCard maturity={maturity} ledger={ledger} />
 
