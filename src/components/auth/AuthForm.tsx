@@ -24,16 +24,19 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   }, [state.ok, router, mode]);
 
   return (
-    <div className="w-full max-w-[400px]">
+    <div className="ws-rise w-full max-w-[400px]">
       <div className="mb-7 text-center">
-        <p className="m-0 mb-1 font-heading text-[15px] font-semibold text-sweep">Coach. Don&apos;t Chase.</p>
-        <h1 className="m-0 font-heading text-[26px] font-semibold tracking-[-0.4px] text-ink">
+        {/* compact wordmark — the desktop brand panel carries this, so hide there */}
+        <p className="m-0 mb-1 font-heading text-[15px] font-semibold text-sweep lg:hidden">Coach. Don&apos;t Chase.</p>
+        <h1 className="m-0 font-heading text-[27px] font-semibold tracking-[-0.4px] text-ink">
           {mode === "sign-up" ? "Create your workspace" : "Welcome back"}
         </h1>
-        <p className="m-0 mt-1.5 text-[13.5px] text-muted">The Warm Sweep™ · by Delegate and Done</p>
+        <p className="m-0 mt-1.5 text-[13.5px] text-muted">
+          {mode === "sign-up" ? "Set up in about two minutes." : "The Warm Sweep™ · by Delegate and Done"}
+        </p>
       </div>
 
-      <form action={formAction} className="rounded-xl2 border border-line bg-white p-7">
+      <form action={formAction} className="rounded-xl2 border border-line bg-white p-7 shadow-pop">
         {state.error && (
           <div className="mb-4 rounded-lg border border-[#f0d2c9] bg-[#fbf0ec] px-4 py-3 text-[13px] text-[#a14a2c]">
             {state.error}
