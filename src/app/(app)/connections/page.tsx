@@ -38,7 +38,7 @@ export default async function ConnectionsPage() {
 
   return (
     <>
-      <Topbar title="Connections" />
+      <Topbar title="Connections" subtitle="Email, calendar, lead sources & autopilot" />
       <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
         <ConnectionsClient
           mailboxes={vms}

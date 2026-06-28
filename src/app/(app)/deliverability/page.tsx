@@ -44,7 +44,7 @@ export default async function DeliverabilityPage() {
 
   return (
     <>
-      <Topbar title="Deliverability" />
+      <Topbar title="Deliverability" subtitle="Sending health & suppression" />
       <div className="ws-rise max-w-[1000px] flex-1 px-[34px] pb-[60px] pt-[30px]">
         {/* health + metrics */}
         <div className="mb-[18px] grid grid-cols-1 gap-[18px] lg:grid-cols-[0.9fr_1.4fr]">

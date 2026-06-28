@@ -57,7 +57,7 @@ export default async function ConversationsPage() {
 
   return (
     <>
-      <Topbar title="Conversations" />
+      <Topbar title="Conversations" subtitle="Threads your agent is handling" />
       <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
         <ConversationsClient conversations={vms} />
       </div>
