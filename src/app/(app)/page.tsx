@@ -9,6 +9,8 @@ import { BookingCelebration } from "@/components/magic/BookingCelebration";
 import { MorningBrief } from "@/components/magic/MorningBrief";
 import { GuaranteeTracker } from "@/components/magic/GuaranteeTracker";
 import { ReactivationsChart } from "@/components/dashboard/ReactivationsChart";
+import { SampleDataBanner } from "@/components/dashboard/SampleDataBanner";
+import { SAMPLE_SOURCE } from "@/lib/sample/seed";
 import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
 import { guaranteeStatus } from "@/lib/guarantee";
@@ -27,17 +29,27 @@ export default async function CommandCenter() {
     latestBooking(ctx.orgId),
     dailyBrief(ctx.orgId),
   ]);
-  const [streak, guarantee] = await Promise.all([engagementStreak(ctx.orgId), guaranteeStatus(ctx.orgId)]);
+  const [streak, guarantee, sampleCount] = await Promise.all([
+    engagementStreak(ctx.orgId),
+    guaranteeStatus(ctx.orgId),
+    prisma.lead.count({ where: { orgId: ctx.orgId, source: SAMPLE_SOURCE } }),
+  ]);
+  const hasSample = sampleCount > 0;
   const today = new Date().toISOString().slice(0, 10); // per-day collapse key for the brief
 
-  // Celebrate a booking only while it's fresh (< 48h); the component remembers dismissal.
+  // Celebrate a booking only while it's fresh (< 48h); the component remembers
+  // dismissal. Suppressed while the workspace is still on sample data — the
+  // sample booking shouldn't fake a real win.
   const celebrate =
-    recentBooking && Date.now() - recentBooking.bookedAt.getTime() < 48 * 3600 * 1000 ? recentBooking : null;
+    !hasSample && recentBooking && Date.now() - recentBooking.bookedAt.getTime() < 48 * 3600 * 1000 ? recentBooking : null;
 
   return (
     <>
       <Topbar title="Command Center" subtitle="Your reactivation at a glance" />
       <div className="ws-rise flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
+        {/* Alive-from-zero: frame the seeded sample data + offer the next steps */}
+        {hasSample && <SampleDataBanner />}
+
         {/* M9: the payoff moment — a fresh booking lands loud */}
         {celebrate && (
           <BookingCelebration
@@ -54,8 +66,8 @@ export default async function CommandCenter() {
         {/* M9: guided first sweep — shown until they take one lead all the way to a send */}
         {!firstRun.complete && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
 
-        {/* M10: the daily habit loop — what the agent did overnight */}
-        {firstRun.complete && <MorningBrief brief={brief} streak={streak} dateKey={today} />}
+        {/* M10: the daily habit loop — what the agent did overnight (real data only) */}
+        {firstRun.complete && !hasSample && <MorningBrief brief={brief} streak={streak} dateKey={today} />}
 
         {/* KPI row */}
         <div className="mb-[22px] grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-4">
