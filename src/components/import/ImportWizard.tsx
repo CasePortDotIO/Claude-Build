@@ -59,6 +59,19 @@ export function ImportWizard() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!/\.csv$/i.test(file.name) && file.type !== "text/csv") {
+      setError("That doesn't look like a CSV. Export your list as .csv and try again.");
+      return;
+    }
+    onFile(file);
+  }
 
   function onFile(file: File) {
     setError(null);
@@ -126,8 +139,9 @@ export function ImportWizard() {
 
     return (
       <div className="max-w-[860px]">
+        <StepBar active={2} />
         {/* The reveal — the money that just walked back through the door. */}
-        <div className="relative overflow-hidden rounded-xl2 bg-charcoal p-8 text-white sm:p-10">
+        <div className="relative overflow-hidden rounded-xl2 bg-charcoal p-8 text-white shadow-card sm:p-10">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-charcoal-soft px-3 py-1.5 text-[11.5px] font-semibold uppercase tracking-[1.6px] text-sweep-light">
             <span className="inline-block h-2 w-2 animate-wsPulse rounded-full bg-sweep-light" />
             Sweep imported
@@ -206,6 +220,7 @@ export function ImportWizard() {
 
   return (
     <div className="max-w-[860px]">
+      <StepBar active={step === "upload" ? 0 : 1} />
       {error && (
         <div className="mb-4 rounded-lg border border-[#f0d2c9] bg-[#fbf0ec] px-4 py-3 text-[13.5px] text-[#a14a2c]">
           {error}
@@ -214,7 +229,7 @@ export function ImportWizard() {
 
       {step === "upload" && (
         <>
-        <div className="rounded-xl2 border border-line bg-white p-7">
+        <div className="rounded-xl2 border border-line bg-white p-7 shadow-card">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <label className="mb-2 block text-[13px] font-semibold text-ink">Sweep name</label>
@@ -243,11 +258,18 @@ export function ImportWizard() {
             </div>
           </div>
           <label className="mb-2 mt-5 block text-[13px] font-semibold text-ink">Lead list (CSV)</label>
-          <label className="block cursor-pointer rounded-xl border-2 border-dashed border-[#d2ccbe] bg-white p-8 text-center hover:border-sweep">
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            className={`block cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+              dragging ? "border-sweep bg-sweep-mist" : "border-[#d2ccbe] bg-white hover:border-sweep"
+            }`}
+          >
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B7A57" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
             </svg>
-            <p className="m-0 text-[14px] font-semibold text-ink">Drop a CSV or click to choose</p>
+            <p className="m-0 text-[14px] font-semibold text-ink">{dragging ? "Drop to upload" : "Drop a CSV or click to choose"}</p>
             <p className="m-0 mt-1 text-[12.5px] text-muted">First row should be column headers</p>
             <input
               type="file"
@@ -264,7 +286,7 @@ export function ImportWizard() {
       {step === "map" && preview && (
         <div className="space-y-4">
           {/* mapper */}
-          <div className="rounded-xl2 border border-line bg-white p-7">
+          <div className="rounded-xl2 border border-line bg-white p-7 shadow-card">
             <h3 className="m-0 mb-1 font-heading text-[16px] font-semibold text-ink">Map your columns</h3>
             <p className="m-0 mb-5 text-[13px] text-muted">
               {preview.rowCount} contacts detected in <span className="font-medium text-ink">{fileName}</span>. Match
@@ -302,7 +324,7 @@ export function ImportWizard() {
           </div>
 
           {/* preview table */}
-          <div className="overflow-hidden rounded-xl2 border border-line bg-white">
+          <div className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
             <div className="border-b border-line-2 bg-cream-head px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">
               Preview · first {preview.rows.length} rows
             </div>
@@ -333,7 +355,7 @@ export function ImportWizard() {
           </div>
 
           {/* prior-contact gate */}
-          <div className="rounded-xl2 border border-[#f0dcc9] bg-[#FBF3EC] p-5">
+          <div className="rounded-xl2 border border-[#f0dcc9] bg-[#FBF3EC] p-5 shadow-card">
             <p className="m-0 mb-3 text-[13.5px] leading-[1.5] text-[#7a5a44]">
               <strong className="font-semibold text-[#5a4030]">The Warm Sweep only re-engages prior contacts.</strong>{" "}
               Confirm a lawful basis before importing — this is reactivation, not cold outreach.
@@ -384,9 +406,34 @@ export function ImportWizard() {
   );
 }
 
+const IMPORT_STEPS = ["Upload", "Map columns", "Done"] as const;
+function StepBar({ active }: { active: number }) {
+  return (
+    <div className="mb-6">
+      <div className="mb-2 flex items-center gap-2">
+        {IMPORT_STEPS.map((label) => (
+          <div key={label} className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-2">
+            <div
+              className="h-full rounded-full bg-sweep transition-all duration-300"
+              style={{ width: IMPORT_STEPS.indexOf(label) <= active ? "100%" : "0%" }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.6px]">
+        {IMPORT_STEPS.map((label, i) => (
+          <span key={label} className={i === active ? "text-sweep" : i < active ? "text-muted-2" : "text-muted-3"}>
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Stat({ n, label, tone }: { n: number; label: string; tone?: "sweep" }) {
   return (
-    <li className="rounded-xl2 border border-line bg-white px-4 py-3 text-center">
+    <li className="rounded-xl2 border border-line bg-white px-4 py-3 text-center shadow-card">
       <p className={`m-0 font-heading text-[22px] font-semibold tabular-nums ${tone === "sweep" ? "text-sweep" : "text-ink"}`}>
         {n.toLocaleString("en-US")}
       </p>
