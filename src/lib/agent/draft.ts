@@ -53,9 +53,10 @@ export async function generateDraftsForLead(opts: {
   leadId: string;
   operatorName: string;
   variantCount?: number;
+  followUp?: { touch: number; isFinal: boolean; previousSubject?: string | null };
 }) {
   const start = Date.now();
-  const { orgId, leadId, operatorName, variantCount = 3 } = opts;
+  const { orgId, leadId, operatorName, variantCount = 3, followUp } = opts;
 
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
   if (!lead) throw new DraftGuardError("Lead not found in this workspace.");
@@ -123,6 +124,7 @@ export async function generateDraftsForLead(opts: {
     cohort,
     retiredPhrases: learning?.retiredPhrases ?? [],
     promotedOpeners: learning?.promotedOpeners ?? [],
+    followUp,
   };
 
   // Reason: call the provider (Claude or stub). If a keyed provider fails at

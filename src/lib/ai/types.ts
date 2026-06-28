@@ -36,6 +36,10 @@ export interface DraftInput {
   cohort?: "TREATMENT" | "HOLDOUT";
   retiredPhrases?: string[]; // openers the agent learned to avoid
   promotedOpeners?: string[]; // openers the agent learned to favor
+  // Multi-touch follow-up: when set, this draft is follow-up #touch to a prior
+  // unanswered send (touch 1 was the first email). isFinal marks the graceful
+  // "breakup" close. Most reactivations land on touch 2–3, not touch 1.
+  followUp?: { touch: number; isFinal: boolean; previousSubject?: string | null };
 }
 
 export interface DraftVariantOut {
