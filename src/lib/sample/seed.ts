@@ -13,7 +13,16 @@ import { prisma } from "@/lib/prisma";
  * depends on a provider key at sign-up time.
  */
 export const SAMPLE_SOURCE = "sample";
-const SAMPLE_MAILBOX = (slug: string) => `you@${slug}.sample`;
+// The sample sending identity is the only mailbox whose address ends in
+// `.sample`. That suffix is the marker the onboarding wizard uses to ignore it,
+// so a seeded workspace still prompts the operator to connect their real inbox.
+export const SAMPLE_MAILBOX_SUFFIX = ".sample";
+const SAMPLE_MAILBOX = (slug: string) => `you@${slug}${SAMPLE_MAILBOX_SUFFIX}`;
+
+/** True for the seeded demo mailbox — used to keep it out of onboarding state. */
+export function isSampleMailbox(email: string): boolean {
+  return email.endsWith(SAMPLE_MAILBOX_SUFFIX);
+}
 
 export async function seedSampleData({ orgId, operatorName }: { orgId: string; operatorName: string }): Promise<void> {
   // Idempotent: never double-seed.
@@ -24,13 +33,14 @@ export async function seedSampleData({ orgId, operatorName }: { orgId: string; o
   const slug = org?.slug ?? "workspace";
   const sig = firstName(operatorName);
 
-  // Simulated sending identity + calendar so messages/bookings are valid and the
-  // app feels "connected" while exploring. Removed on Clear sample data.
+  // Simulated sending identity so the sample messages/conversations are valid.
+  // Removed on Clear sample data. We deliberately DON'T pre-connect a calendar:
+  // a SIMULATION calendar is indistinguishable from one the wizard creates, so
+  // pre-connecting it would make onboarding think the operator already set up
+  // their real calendar. The sample booking row lights up the dashboard on its
+  // own (calendarConnectionId is optional).
   const mailbox = await prisma.mailbox.create({
     data: { orgId, email: SAMPLE_MAILBOX(slug), provider: "SIMULATION", status: "CONNECTED", dailyCap: 40 },
-  });
-  const calendar = await prisma.calendarConnection.create({
-    data: { orgId, provider: "SIMULATION", status: "CONNECTED", timezone: "UTC", bookingLink: "https://cal.com/demo/intro" },
   });
 
   const now = Date.now();
@@ -173,7 +183,7 @@ export async function seedSampleData({ orgId, operatorName }: { orgId: string; o
   const end = new Date(start.getTime() + 30 * 60_000);
   await prisma.booking.create({
     data: {
-      orgId, leadId: jordan.id, conversationId: jordanConvo.id, calendarConnectionId: calendar.id,
+      orgId, leadId: jordan.id, conversationId: jordanConvo.id,
       status: "CONFIRMED", startsAt: start, endsAt: end, attendeeEmail: jordan.email, attendeeName: "Jordan Lee",
       meetingUrl: "https://cal.com/demo/intro", source: "agent", valueCents: jordan.dealValueCents, timezone: "UTC",
     },
@@ -182,20 +192,15 @@ export async function seedSampleData({ orgId, operatorName }: { orgId: string; o
 
 /**
  * Remove every trace of the sample data: deleting the sample leads cascades to
- * their drafts/variants/messages/conversations/bookings; the sample mailbox and
- * SIMULATION calendar are removed too. Real imported leads are untouched.
+ * their drafts/variants/messages/conversations/bookings; the sample mailbox
+ * (the `.sample` sending identity) is removed too. Real imported leads and any
+ * mailbox/calendar the operator actually connected are untouched.
  */
 export async function clearSampleData(orgId: string): Promise<number> {
-  const leads = await prisma.lead.findMany({ where: { orgId, source: SAMPLE_SOURCE }, select: { id: true } });
-  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { slug: true } });
-  const slug = org?.slug ?? "workspace";
-
   const del = await prisma.lead.deleteMany({ where: { orgId, source: SAMPLE_SOURCE } });
-  // Remove the sample mailbox + simulated calendar (cascade already cleared any
-  // messages/bookings via the leads above).
-  await prisma.mailbox.deleteMany({ where: { orgId, email: SAMPLE_MAILBOX(slug), provider: "SIMULATION" } });
-  await prisma.calendarConnection.deleteMany({ where: { orgId, provider: "SIMULATION", bookingLink: "https://cal.com/demo/intro" } });
-  void leads;
+  // Remove the sample mailbox (cascade already cleared its messages via the
+  // leads above). Matched by the `.sample` suffix so a real connection is safe.
+  await prisma.mailbox.deleteMany({ where: { orgId, email: { endsWith: SAMPLE_MAILBOX_SUFFIX } } });
   return del.count;
 }
 
