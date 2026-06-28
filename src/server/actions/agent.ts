@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 import { requireOrg } from "@/lib/auth-helpers";
 import { learnVoice } from "@/lib/agent/voice";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
@@ -65,20 +65,35 @@ export async function generateDraftsAction(raw: unknown): Promise<AgentActionRes
   const op = await operatorName(ctx.orgId);
   let generated = 0;
   const skipped: { leadId: string; reason: string }[] = [];
+  let hadUnexpectedError = false;
 
   for (const leadId of parsed.data.leadIds) {
     try {
-      await generateDraftsForLead({ orgId: ctx.orgId, leadId, operatorName: op, variantCount: parsed.data.variantCount });
+      // Retry transient DB connection drops (stale Neon connection after idle).
+      await withDbRetry(() =>
+        generateDraftsForLead({ orgId: ctx.orgId, leadId, operatorName: op, variantCount: parsed.data.variantCount }),
+      );
       generated += 1;
     } catch (e) {
-      if (e instanceof DraftGuardError) skipped.push({ leadId, reason: e.message });
-      else skipped.push({ leadId, reason: e instanceof Error ? e.message : "Unknown error" });
+      if (e instanceof DraftGuardError) {
+        skipped.push({ leadId, reason: e.message });
+      } else {
+        hadUnexpectedError = true;
+        skipped.push({ leadId, reason: e instanceof Error ? e.message : "Unknown error" });
+      }
     }
   }
 
   revalidatePath("/approvals");
   revalidatePath("/leads");
   revalidatePath("/");
+
+  // Don't disguise a backend failure as success: if nothing was drafted and the
+  // skips were unexpected errors (not eligibility guards), report it so the
+  // button surfaces the problem instead of silently doing nothing.
+  if (generated === 0 && hadUnexpectedError) {
+    return { ok: false, generated, skipped, error: `Couldn't generate drafts: ${skipped[0]?.reason ?? "server error"}` };
+  }
   return { ok: true, generated, skipped, message: `Drafted ${generated} lead(s); skipped ${skipped.length}.` };
 }
 
