@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -8,6 +8,7 @@ import { LEAD_STATUS_META } from "@/lib/types";
 import { generateDraftsAction } from "@/server/actions/agent";
 import { eraseLeadAction } from "@/server/actions/compliance";
 import { toast, toastResult } from "@/components/ui/Toast";
+import { Kbd } from "@/components/ui/Kbd";
 import type { LeadStatus } from "@prisma/client";
 
 // Serializable shape passed from the server page (no Date objects).
@@ -78,11 +79,43 @@ export function LeadsView({
     });
   }
 
+  // Keyboard-first navigation — j/k (or arrows) move the selection; g drafts the
+  // selected lead when eligible. Latest state read via a ref (no stale closures).
+  const h = useRef({ leads, selected, drafts });
+  h.current = { leads, selected, drafts };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const s = h.current;
+      if (s.leads.length === 0) return;
+      const idx = s.leads.findIndex((l) => l.id === s.selected?.id);
+      switch (e.key) {
+        case "j": case "ArrowDown": { e.preventDefault(); const n = s.leads[Math.min(idx + 1, s.leads.length - 1)]; if (n) setSelectedId(n.id); break; }
+        case "k": case "ArrowUp": { e.preventDefault(); const n = s.leads[Math.max(idx - 1, 0)]; if (n) setSelectedId(n.id); break; }
+        case "g": {
+          if (s.selected && ELIGIBLE.has(s.selected.status) && !s.drafts[s.selected.id]) { e.preventDefault(); generate([s.selected.id]); }
+          break;
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (leads.length === 0) {
     return (
-      <div className="rounded-xl2 border border-line bg-white p-12 text-center">
+      <div className="ws-rise rounded-xl2 border border-line bg-white p-12 text-center shadow-card">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sweep-mist text-sweep">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+        </div>
         <p className="m-0 mb-2 font-heading text-[18px] font-semibold text-ink">No leads yet</p>
-        <p className="m-0 text-[14px] text-muted">Import a CSV of prior contacts to start your first sweep.</p>
+        <p className="m-0 mb-5 text-[14px] text-muted">Import a CSV of prior contacts to start your first sweep.</p>
+        <Link href="/leads/import" className="inline-block rounded-lg bg-ember px-5 py-2.5 font-heading text-[13.5px] font-semibold text-white hover:bg-ember-hover">
+          Import leads →
+        </Link>
       </div>
     );
   }
@@ -105,7 +138,7 @@ export function LeadsView({
 
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[1.5fr_1fr]">
         {/* table */}
-        <div className="overflow-hidden rounded-xl2 border border-line bg-white">
+        <div className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
           <div className="grid grid-cols-[1.6fr_0.9fr_1fr] gap-3 border-b border-line-2 bg-cream-head px-[22px] py-3.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">Contact</span>
             <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">Draft</span>
@@ -118,10 +151,11 @@ export function LeadsView({
               <button
                 key={l.id}
                 onClick={() => setSelectedId(l.id)}
-                className={`grid w-full grid-cols-[1.6fr_0.9fr_1fr] items-center gap-3 border-b border-line-2 px-[22px] py-3.5 text-left last:border-b-0 transition-colors ${
+                className={`relative grid w-full grid-cols-[1.6fr_0.9fr_1fr] items-center gap-3 border-b border-line-2 px-[22px] py-3.5 pl-6 text-left last:border-b-0 transition-colors ${
                   on ? "bg-cream" : "hover:bg-cream-head"
                 }`}
               >
+                {on && <span className="absolute left-0 top-0 h-full w-[3px] bg-sweep" />}
                 <div className="min-w-0">
                   <p className="m-0 mb-0.5 truncate text-[14.5px] font-semibold text-ink">{fullName(l)}</p>
                   <p className="m-0 truncate text-[12px] text-muted-3">cold {l.coldFor}</p>
@@ -202,6 +236,12 @@ export function LeadsView({
             <p className="m-0 text-[14px] text-on-dark-soft">Select a lead to see what the agent understands.</p>
           )}
         </div>
+      </div>
+
+      {/* keyboard hint bar */}
+      <div className="mt-3 hidden flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11.5px] text-muted-3 sm:flex">
+        <span className="flex items-center gap-1"><Kbd>J</Kbd><Kbd>K</Kbd> move between leads</span>
+        <span className="flex items-center gap-1"><Kbd>G</Kbd> generate draft for selected</span>
       </div>
     </>
   );
