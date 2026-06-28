@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signInSchema, signUpSchema } from "@/lib/zod/org";
 import { signIn } from "@/lib/auth";
+import { seedSampleData } from "@/lib/sample/seed";
 
 function slugify(name: string): string {
   return (
@@ -47,14 +48,23 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
-  await prisma.$transaction(async (tx) => {
+  const orgId = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({ data: { name, email, passwordHash } });
     const org = await tx.org.create({ data: { name: orgName, slug, type: "CLIENT" } });
     await tx.membership.create({ data: { userId: user.id, orgId: org.id, role: "CLIENT_ADMIN" } });
     await tx.auditLog.create({
       data: { orgId: org.id, actorId: user.id, action: "org.create", targetType: "Org", targetId: org.id },
     });
+    return org.id;
   });
+
+  // Alive-from-zero: seed clearly-labeled sample data so every screen is
+  // explorable on first login. Never let a seeding hiccup block sign-up.
+  try {
+    await seedSampleData({ orgId, operatorName: name });
+  } catch (err) {
+    console.error("sample seed failed (non-fatal):", err);
+  }
 
   // signIn with redirect handled by the caller's redirect on success.
   await signIn("credentials", { email, password, redirect: false });
