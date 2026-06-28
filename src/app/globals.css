@@ -44,3 +44,37 @@ body {
 .ws-rise {
   animation: wsRise 0.5s ease both;
 }
+
+/* ── Visual system polish ─────────────────────────────────────────────────── */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Consistent, on-brand keyboard focus — shown only for keyboard users, never
+   on mouse click. Inputs/selects/textareas keep their own focus ring. */
+a:focus-visible,
+button:focus-visible,
+[role="switch"]:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(27, 122, 87, 0.6);
+  outline-offset: 2px;
+}
+
+/* Honor reduced-motion: keep the UI calm for those who ask for it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
