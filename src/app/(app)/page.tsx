@@ -63,8 +63,9 @@ export default async function CommandCenter() {
           />
         )}
 
-        {/* M9: guided first sweep — shown until they take one lead all the way to a send */}
-        {!firstRun.complete && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
+        {/* M9: guided first sweep — shown until they take one lead all the way to
+            a send. Suppressed while on sample data (the banner is onboarding then). */}
+        {!firstRun.complete && !hasSample && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
 
         {/* M10: the daily habit loop — what the agent did overnight (real data only) */}
         {firstRun.complete && !hasSample && <MorningBrief brief={brief} streak={streak} dateKey={today} />}

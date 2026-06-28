@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { seedSampleData, clearSampleData, SAMPLE_SOURCE } from "@/lib/sample/seed";
+import { firstRunState } from "@/lib/metrics";
 
 /**
  * DB-backed test for alive-from-zero sample data. Verifies:
@@ -44,6 +45,15 @@ describe("sample data seed/clear", () => {
     expect(await prisma.mailbox.count({ where: { orgId, status: "CONNECTED" } })).toBe(1);
     // No calendar is pre-connected — onboarding must still prompt for the real one.
     expect(await prisma.calendarConnection.count({ where: { orgId } })).toBe(0);
+
+    // Sample data must NOT count as real onboarding progress — firstRunState
+    // excludes the `.sample` mailbox and source="sample" leads. (The real CSV
+    // lead seeded in beforeAll keeps leadsImported true; the rest stay false.)
+    const fr = await firstRunState(orgId);
+    expect(fr.mailboxConnected).toBe(false);
+    expect(fr.draftsGenerated).toBe(false);
+    expect(fr.firstSent).toBe(false);
+    expect(fr.complete).toBe(false);
   });
 
   it("clears all sample data but leaves real leads untouched", async () => {
