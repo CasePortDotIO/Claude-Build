@@ -4,7 +4,9 @@ import { BOOKED_STATUSES } from "@/lib/booking-status";
 // Command Center metrics + activity feed, all org-scoped. Pure reads.
 
 export interface CommandCenterKpis {
-  recoveredRevenueCents: number;
+  recoveredRevenueCents: number; // all-time
+  recoveredThisMonthCents: number; // current calendar month — the hero number
+  callsBookedThisMonth: number;
   callsBooked: number;
   callsShowed: number;
   replyRate: number; // 0..1
@@ -15,9 +17,17 @@ export interface CommandCenterKpis {
 }
 
 export async function commandCenterKpis(orgId: string): Promise<CommandCenterKpis> {
-  const [revenue, callsBooked, callsShowed, contacted, replied, active, reachableWorking] = await Promise.all([
+  // The dream outcome is "money back this month", not lifetime — anchor the hero
+  // metric to the current calendar month so it always reads as live recovery.
+  const monthStart = new Date();
+  monthStart.setHours(0, 0, 0, 0);
+  monthStart.setDate(1);
+
+  const [revenue, revenueMonth, callsBooked, callsBookedThisMonth, callsShowed, contacted, replied, active, reachableWorking] = await Promise.all([
     prisma.booking.aggregate({ where: { orgId, status: { in: BOOKED_STATUSES } }, _sum: { valueCents: true } }),
+    prisma.booking.aggregate({ where: { orgId, status: { in: BOOKED_STATUSES }, createdAt: { gte: monthStart } }, _sum: { valueCents: true } }),
     prisma.booking.count({ where: { orgId, status: { in: BOOKED_STATUSES } } }),
+    prisma.booking.count({ where: { orgId, status: { in: BOOKED_STATUSES }, createdAt: { gte: monthStart } } }),
     prisma.booking.count({ where: { orgId, status: "SHOWED" } }),
     // "Contacted" = at least one outbound message went out.
     prisma.message.findMany({ where: { orgId, direction: "OUTBOUND" }, distinct: ["leadId"], select: { leadId: true } }),
@@ -31,6 +41,8 @@ export async function commandCenterKpis(orgId: string): Promise<CommandCenterKpi
   const repliedN = replied.length;
   return {
     recoveredRevenueCents: revenue._sum.valueCents ?? 0,
+    recoveredThisMonthCents: revenueMonth._sum.valueCents ?? 0,
+    callsBookedThisMonth,
     callsBooked,
     callsShowed,
     replyRate: contactedN ? repliedN / contactedN : 0,

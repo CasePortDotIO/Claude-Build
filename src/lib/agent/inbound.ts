@@ -10,6 +10,7 @@ import { storeMemory } from "@/lib/memory";
 import { autoPauseDecision } from "@/lib/compliance/caps";
 import { classifyReplyIntent } from "@/lib/agent/reply-intent";
 import { recordOutcome } from "@/lib/outcomes";
+import { notifyReply } from "@/lib/notify";
 import type { ThreadTurn, VoiceProfileShape } from "@/lib/ai/types";
 
 export interface IngestResult {
@@ -126,6 +127,16 @@ export async function ingestInboundEmail(opts: {
     where: { id: conversation.id },
     data: { lastInboundAt: email.receivedAt, status: "NEEDS_REVIEW", reviewReason: assessment.needsHuman ? assessment.reason : null },
   });
+
+  // Real-time alert: the "someone replied" moment is the week-one win — push it
+  // now rather than burying it in the daily brief. Best-effort, post-commit, so a
+  // dead webhook can never break reply ingestion.
+  const leadName = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email;
+  try {
+    await notifyReply({ orgId, leadName, snippet: email.body, needsReview: assessment.needsHuman });
+  } catch {
+    /* best-effort notification */
+  }
 
   return { outcome: "reply", leadId: lead.id, conversationId: conversation.id, replyDraftId };
 }

@@ -6,13 +6,14 @@ import { calcomWebhookUrl } from "@/lib/webhook-token";
 import { Topbar } from "@/components/nav/Topbar";
 import { ConnectionsClient, type MailboxVM } from "@/components/connections/ConnectionsClient";
 import { LeadSourcesSection, type ConnectedSource } from "@/components/connections/LeadSourcesSection";
+import { AutopilotSection } from "@/components/connections/AutopilotSection";
 
 export default async function ConnectionsPage() {
   const ctx = await requireOrg();
   const [mailboxes, calendars, org, leadSources] = await Promise.all([
     prisma.mailbox.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
     prisma.calendarConnection.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
-    prisma.org.findUnique({ where: { id: ctx.orgId }, select: { slackWebhookEnc: true } }),
+    prisma.org.findUnique({ where: { id: ctx.orgId }, select: { slackWebhookEnc: true, autopilotSync: true, autopilotDraft: true, autopilotSend: true } }),
     prisma.leadSourceConnection.findMany({ where: { orgId: ctx.orgId } }),
   ]);
 
@@ -48,6 +49,13 @@ export default async function ConnectionsPage() {
           calcomWebhookUrl={calcomWebhookUrl(ctx.orgId)}
         />
         <LeadSourcesSection connected={connectedSources} />
+        <AutopilotSection
+          initial={{
+            sync: org?.autopilotSync ?? false,
+            draft: org?.autopilotDraft ?? false,
+            send: org?.autopilotSend ?? false,
+          }}
+        />
       </div>
     </>
   );
