@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { openerStats, hourStats, cohortStats, abLift } from "@/lib/agent/rollups";
+import { openerStats, hourStats, cohortStats, abLift, type OpenerStat } from "@/lib/agent/rollups";
 import type { InsightKind, Prisma } from "@prisma/client";
 
 /**
@@ -41,18 +41,29 @@ export async function runReflection(orgId: string): Promise<ReflectionResult> {
 
   const proposals: ProposedInsight[] = [];
 
-  // 1. Promote the best-performing opener (if clearly ahead of the field).
-  const rankedOpeners = openers.filter((o) => o.sent >= MIN_SENT_FOR_OPENER);
+  // 1. Promote the best opener — ranked by CONVERSION, not just replies. A booked
+  //    call is the goal (the 30%-recovery target), so weight bookings heavily
+  //    above replies; replies break ties before any calls have landed.
+  const bookRate = (o: OpenerStat) => (o.sent ? o.booked / o.sent : 0);
+  const conversionScore = (o: OpenerStat) => bookRate(o) * 3 + o.replyRate;
+  const rankedOpeners = openers
+    .filter((o) => o.sent >= MIN_SENT_FOR_OPENER)
+    .sort((a, b) => conversionScore(b) - conversionScore(a));
   if (rankedOpeners.length >= 2) {
     const best = rankedOpeners[0];
     const worst = rankedOpeners[rankedOpeners.length - 1];
-    if (best.replyRate > worst.replyRate && best.replyRate > 0) {
-      const factor = worst.replyRate > 0 ? best.replyRate / worst.replyRate : best.replyRate / (1 / best.sent);
+    if (conversionScore(best) > conversionScore(worst) && (best.replyRate > 0 || best.booked > 0)) {
       proposals.push({
         kind: "PROMOTE_OPENER",
-        title: "Lead with the opener that's landing",
-        body: `Messages opening with “${best.opener}…” are getting more replies than the rest. I'll favor that opening line.`,
-        metric: `${(best.replyRate * 100).toFixed(0)}% reply rate vs ${(worst.replyRate * 100).toFixed(0)}% (${factor.toFixed(1)}×)`,
+        title: best.booked > 0 ? "Lead with the opener that books calls" : "Lead with the opener that's landing",
+        body:
+          best.booked > 0
+            ? `Messages opening with “${best.opener}…” are booking the most calls. I'll favor that opening line.`
+            : `Messages opening with “${best.opener}…” are getting more replies than the rest. I'll favor that opening line.`,
+        metric:
+          best.booked > 0
+            ? `${(bookRate(best) * 100).toFixed(0)}% booked + ${(best.replyRate * 100).toFixed(0)}% reply over ${best.sent} sends`
+            : `${(best.replyRate * 100).toFixed(0)}% reply rate vs ${(worst.replyRate * 100).toFixed(0)}%`,
         payload: { promoteOpener: best.opener },
       });
     }
@@ -88,7 +99,7 @@ export async function runReflection(orgId: string): Promise<ReflectionResult> {
     proposals.push({
       kind: "AB_RESULT",
       title: lift.liftPct >= 0 ? "The optimized copy is winning" : "Holdout is ahead — staying cautious",
-      body: `Treatment (agent-optimized) replied ${(lift.treatment.replyRate * 100).toFixed(0)}% vs the holdout control at ${(lift.holdout.replyRate * 100).toFixed(0)}%. Improvement is measured against a real control, not assumed.`,
+      body: `Treatment (agent-optimized) replied ${(lift.treatment.replyRate * 100).toFixed(0)}% and booked ${(lift.treatment.bookRate * 100).toFixed(0)}% vs the holdout control at ${(lift.holdout.replyRate * 100).toFixed(0)}% reply / ${(lift.holdout.bookRate * 100).toFixed(0)}% booked. Measured against a real control, not assumed.`,
       metric: `${lift.liftPct >= 0 ? "+" : ""}${lift.liftPct.toFixed(0)}% lift (n=${lift.treatment.contacted}/${lift.holdout.contacted})`,
     });
   }
