@@ -13,7 +13,7 @@ export default async function AccountPage() {
   return (
     <>
       <Topbar title="Account" subtitle="Workspace & billing" action={null} />
-      <div className="ws-rise max-w-[760px] flex-1 px-[34px] pb-[60px] pt-[30px]">
+      <div className="ws-rise max-w-[760px] flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         <AccountClient
           orgName={org.brandName || org.name}
           billingStatus={org.billingStatus}

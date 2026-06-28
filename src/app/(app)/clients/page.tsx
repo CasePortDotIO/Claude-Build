@@ -30,7 +30,7 @@ export default async function ClientsPage() {
   return (
     <>
       <Topbar title="Clients" subtitle="Your reseller roll-up" />
-      <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
+      <div className="ws-rise flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         {/* reseller banner */}
         <div className="mb-[22px] flex items-center gap-3 rounded-xl2 border border-[#f0dcc9] bg-[#FBF3EC] px-5 py-3.5">
           <span className="flex-none rounded bg-ember px-[7px] py-[3px] text-[9px] font-bold uppercase tracking-[0.8px] text-white">Reseller</span>

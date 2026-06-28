@@ -39,7 +39,7 @@ export default async function ConnectionsPage() {
   return (
     <>
       <Topbar title="Connections" subtitle="Email, calendar, lead sources & autopilot" />
-      <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
+      <div className="ws-rise flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         <ConnectionsClient
           mailboxes={vms}
           googleConfigured={hasGoogleOAuth()}

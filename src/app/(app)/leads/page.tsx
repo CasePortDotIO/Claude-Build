@@ -91,7 +91,7 @@ export default async function LeadsPage({
   return (
     <>
       <Topbar title="Leads" subtitle="Every prior contact and where they stand" />
-      <div className="ws-rise flex-1 px-[34px] pb-[60px] pt-[30px]">
+      <div className="ws-rise flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         <LeadFilters active={activeStatus} query={filter.q ?? ""} />
         <LeadsView leads={rows} drafts={drafts} />
       </div>
