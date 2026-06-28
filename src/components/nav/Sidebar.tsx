@@ -13,13 +13,24 @@ import type { Branding } from "@/lib/branding";
  * The Clients (reseller) item only appears for agency admins.
  */
 
+type NavSection = "workspace" | "setup" | "agency";
+
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  section: NavSection;
   badgeKey?: "pendingDrafts" | "needsReview";
   reseller?: boolean;
 }
+
+// Section order + headers. "workspace" (daily work) leads with no label; setup
+// and agency are quieter, clearly separated so config never crowds daily flow.
+const SECTIONS: { key: NavSection; label: string | null }[] = [
+  { key: "workspace", label: null },
+  { key: "setup", label: "Setup" },
+  { key: "agency", label: "Agency" },
+];
 
 interface MembershipVM {
   orgId: string;
@@ -35,14 +46,14 @@ const ICON = (path: React.ReactNode) => (
 );
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Command Center", icon: ICON(<><rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" /><rect x="14" y="12" width="7" height="9" /><rect x="3" y="16" width="7" height="5" /></>) },
-  { href: "/leads", label: "Leads", icon: ICON(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>) },
-  { href: "/approvals", label: "Approvals", badgeKey: "pendingDrafts", icon: ICON(<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4L12 14.01l-3-3" /></>) },
-  { href: "/conversations", label: "Conversations", badgeKey: "needsReview", icon: ICON(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />) },
-  { href: "/agent", label: "The Agent", icon: ICON(<><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" /><circle cx="12" cy="12" r="3.2" /></>) },
-  { href: "/connections", label: "Connections", icon: ICON(<path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />) },
-  { href: "/deliverability", label: "Deliverability", icon: ICON(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />) },
-  { href: "/clients", label: "Clients", reseller: true, icon: ICON(<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" />) },
+  { section: "workspace", href: "/", label: "Command Center", icon: ICON(<><rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" /><rect x="14" y="12" width="7" height="9" /><rect x="3" y="16" width="7" height="5" /></>) },
+  { section: "workspace", href: "/leads", label: "Leads", icon: ICON(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>) },
+  { section: "workspace", href: "/approvals", label: "Approvals", badgeKey: "pendingDrafts", icon: ICON(<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4L12 14.01l-3-3" /></>) },
+  { section: "workspace", href: "/conversations", label: "Conversations", badgeKey: "needsReview", icon: ICON(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />) },
+  { section: "setup", href: "/agent", label: "The Agent", icon: ICON(<><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" /><circle cx="12" cy="12" r="3.2" /></>) },
+  { section: "setup", href: "/connections", label: "Connections", icon: ICON(<path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />) },
+  { section: "setup", href: "/deliverability", label: "Deliverability", icon: ICON(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />) },
+  { section: "agency", href: "/clients", label: "Clients", reseller: true, icon: ICON(<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" />) },
 ];
 
 export function Sidebar({
@@ -142,32 +153,53 @@ export function Sidebar({
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col gap-[3px] p-3">
-        {nav.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          const badgeCount = item.badgeKey ? badges?.[item.badgeKey] ?? 0 : 0;
+      <nav className="flex flex-1 flex-col gap-1 p-3">
+        {/* Quick find — opens the ⌘K command palette (also bound globally). */}
+        <button
+          onClick={() => window.dispatchEvent(new Event("warmsweep:command"))}
+          className="mb-2 flex items-center gap-2.5 rounded-lg border border-charcoal-line bg-charcoal-soft px-3 py-2 text-[12.5px] text-on-dark-mute transition-colors hover:text-on-dark"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+          </svg>
+          <span>Quick find</span>
+          <kbd className="ml-auto rounded border border-[#34393f] px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide">⌘K</kbd>
+        </button>
+        {SECTIONS.map((sec) => {
+          const items = nav.filter((i) => i.section === sec.key);
+          if (items.length === 0) return null;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
-                active ? "bg-charcoal-soft text-white" : "text-on-dark-soft hover:bg-[#1d2125] hover:text-white"
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {badgeCount > 0 && (
-                <span className="ml-auto rounded-full bg-ember px-2 py-0.5 text-[10px] font-semibold text-white">
-                  {badgeCount}
-                </span>
+            <div key={sec.key} className={sec.label ? "mt-4" : undefined}>
+              {sec.label && (
+                <p className="m-0 mb-1 px-3 text-[10px] font-semibold uppercase tracking-[1.4px] text-on-dark-mute">
+                  {sec.label}
+                </p>
               )}
-              {item.reseller && (
-                <span className="ml-auto rounded border border-[#34393f] px-[5px] py-0.5 text-[9px] font-semibold tracking-[0.8px] text-on-dark-mute">
-                  RESELLER
-                </span>
-              )}
-            </Link>
+              <div className="flex flex-col gap-[3px]">
+                {items.map((item) => {
+                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  const badgeCount = item.badgeKey ? badges?.[item.badgeKey] ?? 0 : 0;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
+                        active ? "bg-charcoal-soft text-white" : "text-on-dark-soft hover:bg-[#1d2125] hover:text-white"
+                      }`}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                      {badgeCount > 0 && (
+                        <span className="ml-auto rounded-full bg-ember px-2 py-0.5 text-[10px] font-semibold text-white">
+                          {badgeCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
