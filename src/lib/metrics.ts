@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { BOOKED_STATUSES } from "@/lib/booking-status";
+import { SAMPLE_SOURCE, SAMPLE_MAILBOX_SUFFIX } from "@/lib/sample/seed";
 
 // Command Center metrics + activity feed, all org-scoped. Pure reads.
 
@@ -65,11 +66,16 @@ export interface FirstRunState {
 }
 
 export async function firstRunState(orgId: string): Promise<FirstRunState> {
+  // Exclude the seeded sample data (a `.sample` mailbox + source="sample" leads
+  // and everything hanging off them) so this reflects the operator's REAL
+  // progress — otherwise sample data would mark a brand-new workspace "set up".
+  const notSampleMailbox = { NOT: { email: { endsWith: SAMPLE_MAILBOX_SUFFIX } } };
+  const notSampleLead = { NOT: { source: SAMPLE_SOURCE } };
   const [mailbox, leadCount, draftCount, sentCount] = await Promise.all([
-    prisma.mailbox.count({ where: { orgId, status: "CONNECTED" } }),
-    prisma.lead.count({ where: { orgId } }),
-    prisma.draft.count({ where: { orgId } }),
-    prisma.message.count({ where: { orgId, direction: "OUTBOUND" } }),
+    prisma.mailbox.count({ where: { orgId, status: "CONNECTED", ...notSampleMailbox } }),
+    prisma.lead.count({ where: { orgId, ...notSampleLead } }),
+    prisma.draft.count({ where: { orgId, lead: notSampleLead } }),
+    prisma.message.count({ where: { orgId, direction: "OUTBOUND", mailbox: notSampleMailbox } }),
   ]);
   const mailboxConnected = mailbox > 0;
   const leadsImported = leadCount > 0;
