@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { simulateReplyAction } from "@/server/actions/mailbox";
 import { getAvailabilityAction, bookCallAction } from "@/server/actions/calendar";
 import { toast, toastResult } from "@/components/ui/Toast";
+import { Kbd } from "@/components/ui/Kbd";
 
 export interface ThreadMessage {
   id: string;
@@ -39,15 +40,67 @@ const STATUS_TAG: Record<string, { label: string; cls: string }> = {
   CLOSED: { label: "Closed", cls: "text-muted-2 bg-line-2" },
 };
 
+/**
+ * Keyboard-first conversations. Master-detail inbox built for speed: j/k (or
+ * arrows) to move between threads, b to open the booking flow, the thread panel
+ * re-pops on selection so switching feels instant. Mirrors the Approvals triage
+ * model so the muscle memory carries across the app.
+ */
 export function ConversationsClient({ conversations }: { conversations: ConversationVM[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activeId, setActiveId] = useState<string | null>(conversations[0]?.id ?? null);
+  const [bookingOpen, setBookingOpen] = useState(false);
 
-  if (conversations.length === 0) {
+  const active = conversations.find((c) => c.id === activeId) ?? conversations[0] ?? null;
+
+  // Reset the booking flow whenever we move to a different thread.
+  useEffect(() => {
+    setBookingOpen(false);
+  }, [activeId]);
+
+  function simulate(kind: "positive" | "optout" | "bounce") {
+    if (!active) return;
+    const leadId = active.leadId;
+    startTransition(async () => {
+      toastResult(await simulateReplyAction({ leadId, kind }), "Reply ingested");
+      router.refresh();
+    });
+  }
+
+  // Single global key handler reading latest state via a ref — j/k navigation
+  // plus b to jump straight into booking a call.
+  const h = useRef({ conversations, active });
+  h.current = { conversations, active };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+      if (typing) {
+        if (e.key === "Escape") (t as HTMLElement).blur();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const s = h.current;
+      if (!s.active) return;
+      const idx = s.conversations.findIndex((c) => c.id === s.active!.id);
+      switch (e.key) {
+        case "j": case "ArrowDown": { e.preventDefault(); const n = s.conversations[Math.min(idx + 1, s.conversations.length - 1)]; if (n) setActiveId(n.id); break; }
+        case "k": case "ArrowUp": { e.preventDefault(); const n = s.conversations[Math.max(idx - 1, 0)]; if (n) setActiveId(n.id); break; }
+        case "b": if (s.active.status !== "BOOKED") { e.preventDefault(); setBookingOpen(true); } break;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (conversations.length === 0 || !active) {
     return (
-      <div className="rounded-xl2 border border-line bg-white p-12 text-center">
-        <p className="m-0 mb-2 font-heading text-[18px] font-semibold text-ink">No conversations yet</p>
+      <div className="ws-rise rounded-xl2 border border-line bg-white p-12 text-center shadow-card">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sweep-mist text-sweep">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+        </div>
+        <p className="m-0 mb-1.5 font-heading text-[18px] font-semibold text-ink">No conversations yet</p>
         <p className="m-0 text-[14px] text-muted">
           Approve a draft and send it — the thread shows up here, and the agent handles the replies.
         </p>
@@ -55,51 +108,48 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
     );
   }
 
-  const active = conversations.find((c) => c.id === activeId) ?? conversations[0];
-
-  function simulate(kind: "positive" | "optout" | "bounce") {
-    startTransition(async () => {
-      toastResult(await simulateReplyAction({ leadId: active.leadId, kind }), "Reply ingested");
-      router.refresh();
-    });
-  }
+  const activeIdx = conversations.findIndex((c) => c.id === active.id);
 
   return (
     <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[1fr_1.5fr]">
       {/* inbox */}
-      <div className="overflow-hidden rounded-xl2 border border-line bg-white">
-        <div className="border-b border-line-2 bg-cream-head px-5 py-4">
+      <div className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
+        <div className="flex items-center justify-between border-b border-line-2 bg-cream-head px-5 py-4">
           <p className="m-0 font-heading text-[15px] font-semibold text-ink">
             Inbox <span className="font-medium text-muted-3">· AI-handled</span>
           </p>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">{conversations.length}</span>
         </div>
-        {conversations.map((c) => {
-          const on = c.id === active.id;
-          const tag = STATUS_TAG[c.status] ?? STATUS_TAG.ACTIVE;
-          return (
-            <button
-              key={c.id}
-              onClick={() => setActiveId(c.id)}
-              className={`flex w-full gap-3 border-b border-line-2 px-5 py-3.5 text-left last:border-b-0 ${on ? "bg-cream" : "hover:bg-cream-head"}`}
-            >
-              <div className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full bg-avatar font-heading text-[15px] font-semibold text-white">
-                {c.initials}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-0.5 flex items-center justify-between gap-2">
-                  <p className="m-0 truncate text-[14px] font-semibold text-ink">{c.leadName}</p>
-                  <span className="flex-none text-[11.5px] text-muted-3">{c.when}</span>
+        <div className="max-h-[64vh] overflow-y-auto">
+          {conversations.map((c) => {
+            const on = c.id === active.id;
+            const tag = STATUS_TAG[c.status] ?? STATUS_TAG.ACTIVE;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setActiveId(c.id)}
+                className={`relative flex w-full gap-3 border-b border-line-2 px-5 py-3.5 pl-6 text-left last:border-b-0 transition-colors ${on ? "bg-cream" : "hover:bg-cream-head"}`}
+              >
+                {on && <span className="absolute left-0 top-0 h-full w-[3px] bg-sweep" />}
+                <div className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full bg-avatar font-heading text-[15px] font-semibold text-white">
+                  {c.initials}
                 </div>
-                <p className="m-0 mb-1.5 truncate text-[13px] text-muted-2">{c.lastSnippet}</p>
-                <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${tag.cls}`}>{tag.label}</span>
-              </div>
-            </button>
-          );
-        })}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-0.5 flex items-center justify-between gap-2">
+                    <p className="m-0 truncate text-[14px] font-semibold text-ink">{c.leadName}</p>
+                    <span className="flex-none text-[11.5px] text-muted-3">{c.when}</span>
+                  </div>
+                  <p className="m-0 mb-1.5 truncate text-[13px] text-muted-2">{c.lastSnippet}</p>
+                  <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${tag.cls}`}>{tag.label}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* thread */}
-      <div className="flex flex-col overflow-hidden rounded-xl2 border border-line bg-white">
+      {/* thread — re-pops on selection change for a responsive feel */}
+      <div key={active.id} className="flex animate-wsPop flex-col overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
         <div className="flex items-center gap-3 border-b border-line-2 px-6 py-4">
           <div className="flex h-[42px] w-[42px] flex-none items-center justify-center rounded-full bg-avatar font-heading text-[15px] font-semibold text-white">
             {active.initials}
@@ -108,6 +158,7 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
             <p className="m-0 font-heading text-[16px] font-semibold text-ink">{active.leadName}</p>
             <p className="m-0 text-[12.5px] text-muted-2">Handled by your agent · {active.leadEmail}</p>
           </div>
+          <span className="hidden flex-none font-mono text-[11px] text-muted-3 sm:inline">{activeIdx + 1} of {conversations.length}</span>
           <span className="flex items-center gap-1.5 rounded-full bg-[rgba(27,122,87,0.08)] px-3 py-1.5 text-[12.5px] font-semibold text-sweep">
             <span className="h-[7px] w-[7px] animate-wsPulse rounded-full bg-sweep" />
             Auto-pilot
@@ -115,7 +166,7 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
         </div>
 
         {/* messages */}
-        <div className="flex min-h-[300px] flex-col gap-3.5 bg-[#FBFAF7] p-6">
+        <div className="ws-scroll flex max-h-[52vh] min-h-[300px] flex-col gap-3.5 overflow-y-auto bg-[#FBFAF7] p-6">
           {active.messages.map((m) => {
             const out = m.direction === "OUTBOUND";
             return (
@@ -159,7 +210,14 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
                 </Link>
               </div>
             )}
-            <BookControl leadId={active.leadId} pending={pending} startTransition={startTransition} onDone={(m) => { toast(m); router.refresh(); }} />
+            <BookControl
+              leadId={active.leadId}
+              pending={pending}
+              open={bookingOpen}
+              setOpen={setBookingOpen}
+              startTransition={startTransition}
+              onDone={(m) => { toast(m); router.refresh(); }}
+            />
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[12.5px] text-muted-2">Demo the reply loop:</span>
               <SimBtn disabled={pending} onClick={() => simulate("positive")}>Positive reply</SimBtn>
@@ -168,6 +226,12 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
             </div>
           </div>
         )}
+      </div>
+
+      {/* keyboard hint bar — full-width under the grid */}
+      <div className="col-span-full hidden flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11.5px] text-muted-3 sm:flex">
+        <span className="flex items-center gap-1"><Kbd>J</Kbd><Kbd>K</Kbd> move between threads</span>
+        {active.status !== "BOOKED" && <span className="flex items-center gap-1"><Kbd>B</Kbd> book the call</span>}
       </div>
     </div>
   );
@@ -188,40 +252,51 @@ function SimBtn({ children, onClick, disabled }: { children: React.ReactNode; on
 function BookControl({
   leadId,
   pending,
+  open,
+  setOpen,
   startTransition,
   onDone,
 }: {
   leadId: string;
   pending: boolean;
+  open: boolean;
+  setOpen: (v: boolean) => void;
   startTransition: (cb: () => Promise<void> | void) => void;
   onDone: (msg: string) => void;
 }) {
   const [slots, setSlots] = useState<{ startsAt: string; label: string }[] | null>(null);
 
-  function loadSlots() {
-    startTransition(async () => {
-      const r = await getAvailabilityAction();
-      if (r.ok && r.slots) setSlots(r.slots);
-      else onDone(r.error ?? "No calendar connected");
-    });
-  }
+  // The `b` shortcut flips `open` — auto-load availability when it does.
+  useEffect(() => {
+    if (open && !slots) {
+      startTransition(async () => {
+        const r = await getAvailabilityAction();
+        if (r.ok && r.slots) setSlots(r.slots);
+        else { onDone(r.error ?? "No calendar connected"); setOpen(false); }
+      });
+    }
+    if (!open) setSlots(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   function book(startsAt: string) {
     startTransition(async () => {
       const r = await bookCallAction({ leadId, startsAt });
       onDone(r.ok ? r.message ?? "Booked" : r.error ?? "Error");
       setSlots(null);
+      setOpen(false);
     });
   }
 
-  if (!slots) {
+  if (!open || !slots) {
     return (
       <div className="flex items-center gap-2">
         <button
           disabled={pending}
-          onClick={loadSlots}
-          className="rounded-lg bg-sweep px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-2 rounded-lg bg-sweep px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
         >
-          Book the call →
+          Book the call → <Kbd dark>B</Kbd>
         </button>
         <span className="text-[12px] text-muted-3">offers real availability from the connected calendar</span>
       </div>
@@ -240,7 +315,7 @@ function BookControl({
           {s.label}
         </button>
       ))}
-      <button onClick={() => setSlots(null)} className="text-[12px] text-muted-3 hover:underline">cancel</button>
+      <button onClick={() => { setSlots(null); setOpen(false); }} className="text-[12px] text-muted-3 hover:underline">cancel</button>
     </div>
   );
 }
