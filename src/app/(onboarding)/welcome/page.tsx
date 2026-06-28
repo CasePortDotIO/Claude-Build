@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hasGoogleOAuth, hasMicrosoftOAuth } from "@/lib/mailbox";
 import { resolveBranding } from "@/lib/branding";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { isSampleMailbox } from "@/lib/sample/seed";
 
 /**
  * Post-signup setup wizard. Moves the "connect email + calendar" basics out of
@@ -23,7 +24,9 @@ export default async function WelcomePage({
     prisma.org.findUnique({ where: { id: ctx.orgId }, select: { name: true, brandName: true, brandColor: true, type: true } }),
   ]);
 
-  const connectedMailbox = mailboxes.find((m) => m.status === "CONNECTED");
+  // The seeded `.sample` demo mailbox doesn't count as the operator's real
+  // sending identity — onboarding should still prompt them to connect one.
+  const connectedMailbox = mailboxes.find((m) => m.status === "CONNECTED" && !isSampleMailbox(m.email));
   const connectedCalendar = calendars.find((c) => c.status === "CONNECTED");
   const branding = resolveBranding(org ?? null);
 

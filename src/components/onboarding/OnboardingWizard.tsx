@@ -221,7 +221,7 @@ export function OnboardingWizard(props: Props) {
 
 function StepCard({ eyebrow, title, blurb, children }: { eyebrow: string; title: string; blurb: string; children: React.ReactNode }) {
   return (
-    <div className="ws-rise rounded-xl2 border border-line bg-white p-7 sm:p-8">
+    <div className="ws-rise rounded-xl2 border border-line bg-white p-7 shadow-card sm:p-8">
       <p className="m-0 mb-2 text-[11.5px] font-semibold uppercase tracking-[1.4px] text-sweep">{eyebrow}</p>
       <h1 className="m-0 mb-1.5 font-heading text-[24px] font-semibold tracking-[-0.4px] text-ink">{title}</h1>
       <p className="m-0 mb-6 text-[14px] leading-[1.55] text-muted">{blurb}</p>
@@ -253,9 +253,9 @@ function OAuthOption({ enabled, href, mono, monoBg, name, desc }: { enabled: boo
       )}
     </>
   );
-  const cls = "flex items-center gap-3.5 rounded-xl2 border border-line bg-white px-4 py-3.5 text-left";
+  const cls = "flex items-center gap-3.5 rounded-xl2 border border-line bg-white px-4 py-3.5 text-left transition-shadow";
   return enabled ? (
-    <a href={href} className={`${cls} hover:border-[#d8d3c8]`}>{inner}</a>
+    <a href={href} className={`${cls} hover:border-[#d8d3c8] hover:shadow-card`}>{inner}</a>
   ) : (
     <div className={`${cls} opacity-70`}>{inner}</div>
   );

@@ -42,6 +42,8 @@ describe("sample data seed/clear", () => {
     expect(await prisma.conversation.count({ where: { orgId } })).toBe(2);
     expect(await prisma.booking.count({ where: { orgId } })).toBe(1);
     expect(await prisma.mailbox.count({ where: { orgId, status: "CONNECTED" } })).toBe(1);
+    // No calendar is pre-connected — onboarding must still prompt for the real one.
+    expect(await prisma.calendarConnection.count({ where: { orgId } })).toBe(0);
   });
 
   it("clears all sample data but leaves real leads untouched", async () => {
