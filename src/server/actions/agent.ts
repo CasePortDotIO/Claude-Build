@@ -100,9 +100,16 @@ export async function generateDraftsAction(raw: unknown): Promise<AgentActionRes
   const org = await prisma.org.findUnique({ where: { id: ctx.orgId }, select: { autopilotApprove: true } });
   let autoMsg = "";
   if (org?.autopilotApprove && generated > 0) {
-    const res = await withDbRetry(() => autoApproveAndSend({ orgId: ctx.orgId, leadIds: parsed.data.leadIds }));
-    if (res.sent > 0 || res.heldForReview > 0) {
-      autoMsg = ` Auto-sent ${res.sent}${res.heldForReview > 0 ? `, ${res.heldForReview} held for review` : ""}.`;
+    // Never let a send-side hiccup mask a successful draft generation — the drafts
+    // are already persisted and will go out on the next send pass either way.
+    try {
+      const res = await withDbRetry(() => autoApproveAndSend({ orgId: ctx.orgId, leadIds: parsed.data.leadIds }));
+      if (res.sent > 0 || res.heldForReview > 0) {
+        autoMsg = ` Auto-sent ${res.sent}${res.heldForReview > 0 ? `, ${res.heldForReview} held for review` : ""}.`;
+      }
+    } catch (e) {
+      console.error("auto-send after generate failed (drafts are queued):", e);
+      autoMsg = " Drafts are queued; auto-send will retry shortly.";
     }
   }
 
