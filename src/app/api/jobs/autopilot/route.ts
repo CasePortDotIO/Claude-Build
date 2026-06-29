@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 import { runAutopilotForOrg } from "@/lib/agent/autopilot";
 
 /**
@@ -21,10 +21,14 @@ async function runJob(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const orgs = await prisma.org.findMany({
-    where: { type: "CLIENT", OR: [{ autopilotSync: true }, { autopilotDraft: true }, { autopilotSend: true }, { autopilotApprove: true }] },
-    select: { id: true },
-  });
+  // withDbRetry: crons fire into a possibly cold Neon compute; retry the first
+  // query (backoff) so a scale-to-zero wake-up doesn't 500 the whole run.
+  const orgs = await withDbRetry(() =>
+    prisma.org.findMany({
+      where: { type: "CLIENT", OR: [{ autopilotSync: true }, { autopilotDraft: true }, { autopilotSend: true }, { autopilotApprove: true }] },
+      select: { id: true },
+    }),
+  );
 
   let synced = 0;
   let drafted = 0;
