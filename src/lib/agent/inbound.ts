@@ -11,6 +11,7 @@ import { autoPauseDecision } from "@/lib/compliance/caps";
 import { classifyReplyIntent } from "@/lib/agent/reply-intent";
 import { recordOutcome } from "@/lib/outcomes";
 import { notifyReply } from "@/lib/notify";
+import { createNotification } from "@/lib/notifications";
 import type { ThreadTurn, VoiceProfileShape } from "@/lib/ai/types";
 
 export interface IngestResult {
@@ -81,11 +82,14 @@ export async function ingestInboundEmail(opts: {
     },
   });
 
+  const who = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email;
+
   // ── Bounce: hard stop + suppress + deliverability accounting ──
   if (flags.isBounce) {
     await applyTerminal(lead.id, "BOUNCE", "BOUNCED", conversation.id, "CLOSED");
     await suppress(orgId, lead.email, "BOUNCED");
     await recordBounceAndMaybePause(mailboxId);
+    await createNotification({ orgId, kind: "BOUNCED", title: `Email bounced: ${who}`, body: "Address is unreachable — suppressed.", actionUrl: `/leads?id=${lead.id}` });
     return { outcome: "bounce", leadId: lead.id, conversationId: conversation.id };
   }
 
@@ -94,6 +98,7 @@ export async function ingestInboundEmail(opts: {
     await applyTerminal(lead.id, "OPT_OUT", "OPTED_OUT", conversation.id, "CLOSED");
     await suppress(orgId, lead.email, "OPTED_OUT");
     await recordComplaintAndMaybePause(mailboxId);
+    await createNotification({ orgId, kind: "OPTED_OUT", title: `${who} opted out`, body: "Unsubscribed and suppressed.", actionUrl: `/leads?id=${lead.id}` });
     return { outcome: "opt_out", leadId: lead.id, conversationId: conversation.id };
   }
 
@@ -131,12 +136,18 @@ export async function ingestInboundEmail(opts: {
   // Real-time alert: the "someone replied" moment is the week-one win — push it
   // now rather than burying it in the daily brief. Best-effort, post-commit, so a
   // dead webhook can never break reply ingestion.
-  const leadName = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email;
   try {
-    await notifyReply({ orgId, leadName, snippet: email.body, needsReview: assessment.needsHuman });
+    await notifyReply({ orgId, leadName: who, snippet: email.body, needsReview: assessment.needsHuman });
   } catch {
     /* best-effort notification */
   }
+  await createNotification({
+    orgId,
+    kind: "REPLY_RECEIVED",
+    title: `${who} replied`,
+    body: email.body.slice(0, 140),
+    actionUrl: `/conversations?c=${conversation.id}`,
+  });
 
   return { outcome: "reply", leadId: lead.id, conversationId: conversation.id, replyDraftId };
 }

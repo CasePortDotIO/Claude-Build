@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { NotificationBell } from "@/components/nav/NotificationBell";
+import { listNotificationsAction } from "@/server/actions/notifications";
 
 /**
  * Sticky page header: title (+ optional subtitle that says what the page is for),
@@ -11,7 +13,7 @@ interface TopbarAction {
   href: string;
 }
 
-export function Topbar({
+export async function Topbar({
   title,
   subtitle,
   action,
@@ -21,6 +23,7 @@ export function Topbar({
   action?: TopbarAction | null;
 }) {
   const cta = action === null ? null : action ?? { label: "New sweep", href: "/leads/import" };
+  const notifications = await listNotificationsAction();
 
   return (
     <header className="sticky top-0 z-30 flex h-[66px] items-center justify-between gap-3 border-b border-[#e7e1d6] bg-[rgba(250,247,242,0.86)] px-4 pl-16 backdrop-blur-md sm:gap-5 lg:px-[34px]">
@@ -29,6 +32,7 @@ export function Topbar({
         {subtitle && <p className="m-0 hidden truncate text-[12.5px] text-muted-2 sm:block">{subtitle}</p>}
       </div>
       <div className="flex flex-none items-center gap-3.5">
+        <NotificationBell initial={notifications} />
         <span className="hidden items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-[12.5px] sm:flex">
           <span className="inline-block h-2 w-2 animate-wsPulse rounded-full bg-sweep" />
           <span className="font-semibold text-sweep">Active</span>
