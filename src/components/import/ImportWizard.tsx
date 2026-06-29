@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Papa from "papaparse";
 import { IMPORTABLE_FIELDS } from "@/lib/types";
 import { importLeadsAction, type ImportResult } from "@/server/actions/import";
 import { CountUp } from "@/components/magic/CountUp";
@@ -78,9 +77,11 @@ export function ImportWizard() {
     setFileName(file.name);
     if (!sweepName) setSweepName(file.name.replace(/\.csv$/i, ""));
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const text = String(reader.result ?? "");
       setCsvText(text);
+      // Load the CSV parser on first use so it isn't in the route's initial JS.
+      const Papa = (await import("papaparse")).default;
       const parsed = Papa.parse<Record<string, string>>(text, {
         header: true,
         skipEmptyLines: "greedy",

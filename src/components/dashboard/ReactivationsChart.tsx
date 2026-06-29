@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ChartBar } from "@/lib/metrics";
 
 /**
@@ -11,12 +11,15 @@ import type { ChartBar } from "@/lib/metrics";
  */
 export function ReactivationsChart({ bars }: { bars: ChartBar[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(1, ...bars.map((b) => b.value));
-  const total = bars.reduce((s, b) => s + b.value, 0);
-  // A clean y-axis ceiling (1,2,3,5,10…) so gridlines land on round numbers.
-  const ceil = niceCeil(max);
-  const ticks = gridTicks(ceil);
   const PLOT = 150; // px plotting height
+  // Derived axis math only depends on the data — memoize so hover/state changes
+  // don't recompute the ceiling + gridlines on every render.
+  const { total, ceil, ticks } = useMemo(() => {
+    const max = Math.max(1, ...bars.map((b) => b.value));
+    // A clean y-axis ceiling (1,2,3,5,10…) so gridlines land on round numbers.
+    const c = niceCeil(max);
+    return { total: bars.reduce((s, b) => s + b.value, 0), ceil: c, ticks: gridTicks(c) };
+  }, [bars]);
 
   return (
     <div className="rounded-xl2 border border-line bg-white p-6 shadow-card">
