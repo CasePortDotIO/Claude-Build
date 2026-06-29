@@ -11,6 +11,8 @@
  * domain to actually deliver.
  */
 
+import { getSecret } from "@/lib/config/secrets";
+
 export interface SendEmailInput {
   to: string;
   subject: string;
@@ -26,19 +28,18 @@ export interface SendEmailResult {
   error?: string;
 }
 
-const FROM = process.env.EMAIL_FROM || "The Warm Sweep <onboarding@resend.dev>";
-
-export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY);
+export async function isEmailConfigured(): Promise<boolean> {
+  return Boolean(await getSecret("RESEND_API_KEY"));
 }
 
 export async function sendTransactionalEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const key = process.env.RESEND_API_KEY;
+  const key = await getSecret("RESEND_API_KEY");
+  const FROM = (await getSecret("EMAIL_FROM")) || "The Warm Sweep <onboarding@resend.dev>";
 
   // Graceful fallback: no provider configured → log + succeed (simulated) so the
   // calling flow (signup, reset, invite) isn't blocked in dev.
   if (!key) {
-    console.info(`[email:simulated] to=${input.to} subject=${JSON.stringify(input.subject)} (set RESEND_API_KEY to deliver)`);
+    console.info(`[email:simulated] to=${input.to} subject=${JSON.stringify(input.subject)} (connect email to deliver)`);
     return { ok: true, simulated: true };
   }
 

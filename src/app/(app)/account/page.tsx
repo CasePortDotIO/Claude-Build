@@ -5,7 +5,9 @@ import { Topbar } from "@/components/nav/Topbar";
 import { AccountClient } from "@/components/account/AccountClient";
 import { TeamSection, type MemberVM, type InviteVM } from "@/components/account/TeamSection";
 import { BillingSection } from "@/components/account/BillingSection";
+import { IntegrationsSection } from "@/components/account/IntegrationsSection";
 import { isBillingConfigured, planDisplay } from "@/lib/billing/stripe";
+import { configuredStatus, SECRET_KEYS } from "@/lib/config/secrets";
 
 export default async function AccountPage() {
   const ctx = await requireOrg();
@@ -23,8 +25,11 @@ export default async function AccountPage() {
   ]);
 
   const isAdmin = ROLE_RANK[ctx.role] >= ROLE_RANK.CLIENT_ADMIN;
-  const billingOn = isBillingConfigured();
-  const plan = planDisplay();
+  const [billingOn, plan, integrationStatus] = await Promise.all([
+    isBillingConfigured(),
+    planDisplay(),
+    isAdmin ? configuredStatus(SECRET_KEYS) : Promise.resolve({}),
+  ]);
   const members: MemberVM[] = memberships.map((m) => ({
     userId: m.user.id,
     name: m.user.name,
@@ -55,6 +60,7 @@ export default async function AccountPage() {
           />
         )}
         <TeamSection members={members} invites={inviteVMs} isAdmin={isAdmin} />
+        <IntegrationsSection status={integrationStatus} isAdmin={isAdmin} />
       </div>
     </>
   );
