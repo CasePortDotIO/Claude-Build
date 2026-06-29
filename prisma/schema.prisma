@@ -157,6 +157,14 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+// Fixed-window rate limiter (e.g. login attempts per IP/email). Keyed by an
+// arbitrary string; count resets when the window rolls over.
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+}
+
 // A pending invitation for someone to join an org with a given role. Only the
 // token hash is stored; the raw token lives in the emailed accept link.
 model Invitation {
