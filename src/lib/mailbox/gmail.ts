@@ -70,6 +70,22 @@ export class GmailProvider implements MailboxProvider {
     };
   }
 
+  async refresh(refreshToken: string): Promise<{ accessToken: string; expiry?: Date }> {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        refresh_token: refreshToken,
+        client_id: process.env.GOOGLE_CLIENT_ID ?? "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+        grant_type: "refresh_token",
+      }),
+    });
+    if (!res.ok) throw new Error(`Google token refresh failed: ${res.status} ${await res.text()}`);
+    const tok = (await res.json()) as { access_token: string; expires_in?: number };
+    return { accessToken: tok.access_token, expiry: tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000) : undefined };
+  }
+
   async send(ctx: MailboxContext, email: OutboundEmail): Promise<SendResult> {
     // RFC 2822 message, base64url-encoded, via the Gmail send endpoint.
     const unsubUrl = email.listUnsubscribeUrl;

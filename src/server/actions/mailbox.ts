@@ -7,7 +7,7 @@ import { sendApprovedDraft, sendAllApproved, SendError } from "@/lib/agent/send"
 import { ingestInboundEmail } from "@/lib/agent/inbound";
 import { reverifyStale } from "@/lib/agent/maintenance";
 import { simulatedLeadReply } from "@/lib/mailbox/simulation";
-import { getMailboxProvider, mailboxContext, hasGoogleOAuth } from "@/lib/mailbox";
+import { getMailboxProvider, getReadyContext, hasGoogleOAuth } from "@/lib/mailbox";
 
 export interface MailboxActionResult {
   ok: boolean;
@@ -138,7 +138,7 @@ export async function syncMailboxesAction(): Promise<MailboxActionResult> {
   let ingested = 0;
   for (const mb of mailboxes) {
     const provider = getMailboxProvider(mb.provider);
-    const { messages, cursor } = await provider.fetchNewMessages(mailboxContext(mb), mb.syncCursor);
+    const { messages, cursor } = await provider.fetchNewMessages(await getReadyContext(mb), mb.syncCursor);
     for (const email of messages) {
       const res = await ingestInboundEmail({ orgId: ctx.orgId, mailboxId: mb.id, email });
       if (res.outcome !== "unmatched") ingested += 1;

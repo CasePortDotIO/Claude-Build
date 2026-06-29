@@ -67,6 +67,23 @@ export class MicrosoftGraphProvider implements MailboxProvider {
     };
   }
 
+  async refresh(refreshToken: string): Promise<{ accessToken: string; expiry?: Date }> {
+    const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.MICROSOFT_CLIENT_ID ?? "",
+        client_secret: process.env.MICROSOFT_CLIENT_SECRET ?? "",
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+        scope: SCOPES.join(" "),
+      }),
+    });
+    if (!res.ok) throw new Error(`Microsoft token refresh failed: ${res.status} ${await res.text()}`);
+    const tok = (await res.json()) as { access_token: string; expires_in?: number };
+    return { accessToken: tok.access_token, expiry: tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000) : undefined };
+  }
+
   async send(ctx: MailboxContext, email: OutboundEmail): Promise<SendResult> {
     const headers: { name: string; value: string }[] = [];
     if (email.listUnsubscribeUrl) {

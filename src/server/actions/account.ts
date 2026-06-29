@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireOrg } from "@/lib/auth-helpers";
-import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
+import { getMailboxProvider, getReadyContext } from "@/lib/mailbox";
 
 export interface AccountActionResult {
   ok: boolean;
@@ -16,7 +16,7 @@ async function emailOperator(orgId: string, to: string, subject: string, body: s
   try {
     const mailbox = await prisma.mailbox.findFirst({ where: { orgId, status: "CONNECTED" }, orderBy: { createdAt: "asc" } });
     if (!mailbox || !to) return;
-    await getMailboxProvider(mailbox.provider).send(mailboxContext(mailbox), { to, subject, body });
+    await getMailboxProvider(mailbox.provider).send(await getReadyContext(mailbox), { to, subject, body });
   } catch {
     /* ignore */
   }

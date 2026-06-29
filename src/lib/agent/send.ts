@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
+import { getMailboxProvider, getReadyContext } from "@/lib/mailbox";
 import { transition } from "@/lib/agent/state-machine";
 import { assertContactable, ComplianceError, complianceFooter, withComplianceFooter, unsubscribeUrl } from "@/lib/compliance";
 import { effectiveDailyCap, isWarmingUp } from "@/lib/compliance/caps";
@@ -108,7 +108,7 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
   const existing = await prisma.conversation.findUnique({ where: { leadId: lead.id } });
 
   const provider = getMailboxProvider(mailbox.provider);
-  const sent = await provider.send(mailboxContext(mailbox), {
+  const sent = await provider.send(await getReadyContext(mailbox), {
     to: lead.email,
     subject: draft.finalSubject ?? "",
     body: compliantBody,
