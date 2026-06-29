@@ -4,6 +4,7 @@ import { ingestLeads } from "@/lib/import/ingest";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
 import { runFollowupsForOrg } from "@/lib/agent/followup";
 import { sendAllApproved } from "@/lib/agent/send";
+import { autoApproveAndSend } from "@/lib/agent/autosend";
 
 /**
  * Autopilot — the always-on engine (M17). Turns the product from a one-time
@@ -31,15 +32,16 @@ export interface AutopilotRunResult {
   skippedDrafts: number; // leads a draft guard refused (opted-out, suppressed, terminal)
   followedUp: number; // follow-up drafts queued for leads that went quiet
   closedOut: number; // leads closed after exhausting their follow-up touches
-  sent: number; // approved drafts sent
+  autoApproved: number; // high-confidence drafts auto-approved (auto-send mode)
+  sent: number; // drafts sent (auto-approved + already-approved)
 }
 
 export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunResult> {
-  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, skippedDrafts: 0, followedUp: 0, closedOut: 0, sent: 0 };
+  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, skippedDrafts: 0, followedUp: 0, closedOut: 0, autoApproved: 0, sent: 0 };
 
   const org = await prisma.org.findUnique({
     where: { id: orgId },
-    select: { id: true, name: true, brandName: true, autopilotSync: true, autopilotDraft: true, autopilotSend: true },
+    select: { id: true, name: true, brandName: true, autopilotSync: true, autopilotDraft: true, autopilotSend: true, autopilotApprove: true },
   });
   if (!org) return result;
 
@@ -108,13 +110,22 @@ export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunRes
     result.closedOut = fu.closed;
   }
 
-  // (3) SEND — only drafts a human already APPROVED. sendAllApproved enforces
-  // every send rail (suppression, daily/hourly caps, warmup ramp, domain auth,
-  // circuit breaker). This collapses time-to-first-touch without ever sending an
-  // unreviewed email.
-  if (org.autopilotSend) {
+  // (2c) AUTO-SEND — when the operator turns off the approval requirement, auto-
+  // approve + send the drafts the agent is confident about (low-confidence ones
+  // still wait in the queue). Every send rail still applies; see autosend.ts.
+  if (org.autopilotApprove) {
+    const res = await autoApproveAndSend({ orgId });
+    result.autoApproved = res.approved;
+    result.sent += res.sent;
+  }
+
+  // (3) SEND — drafts a human already APPROVED (or auto-approved above that a
+  // rail deferred). sendAllApproved enforces every send rail (suppression,
+  // daily/hourly caps, warmup ramp, domain auth, circuit breaker). Collapses
+  // time-to-first-touch.
+  if (org.autopilotSend || org.autopilotApprove) {
     const res = await sendAllApproved(orgId);
-    result.sent = res.sent;
+    result.sent += res.sent;
   }
 
   return result;

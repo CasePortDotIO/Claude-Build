@@ -13,7 +13,7 @@ export default async function ConnectionsPage() {
   const [mailboxes, calendars, org, leadSources] = await Promise.all([
     prisma.mailbox.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
     prisma.calendarConnection.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
-    prisma.org.findUnique({ where: { id: ctx.orgId }, select: { slackWebhookEnc: true, autopilotSync: true, autopilotDraft: true, autopilotSend: true } }),
+    prisma.org.findUnique({ where: { id: ctx.orgId }, select: { slackWebhookEnc: true, autopilotSync: true, autopilotDraft: true, autopilotSend: true, autopilotApprove: true } }),
     prisma.leadSourceConnection.findMany({ where: { orgId: ctx.orgId } }),
   ]);
 
@@ -54,6 +54,7 @@ export default async function ConnectionsPage() {
             sync: org?.autopilotSync ?? false,
             draft: org?.autopilotDraft ?? false,
             send: org?.autopilotSend ?? false,
+            approve: org?.autopilotApprove ?? false,
           }}
         />
       </div>

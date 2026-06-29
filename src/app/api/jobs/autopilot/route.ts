@@ -20,7 +20,7 @@ async function runJob(req: NextRequest) {
   }
 
   const orgs = await prisma.org.findMany({
-    where: { type: "CLIENT", OR: [{ autopilotSync: true }, { autopilotDraft: true }, { autopilotSend: true }] },
+    where: { type: "CLIENT", OR: [{ autopilotSync: true }, { autopilotDraft: true }, { autopilotSend: true }, { autopilotApprove: true }] },
     select: { id: true },
   });
 
