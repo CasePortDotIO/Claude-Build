@@ -36,7 +36,7 @@ export async function Topbar({
         <span className="hidden items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-[12.5px] sm:flex">
           <span className="inline-block h-2 w-2 animate-wsPulse rounded-full bg-sweep" />
           <span className="font-semibold text-sweep">Active</span>
-          <span className="text-[#888780]">v1 · preview &amp; approve</span>
+          <span className="text-[#888780]">preview &amp; approve</span>
         </span>
         {cta && (
           <Link

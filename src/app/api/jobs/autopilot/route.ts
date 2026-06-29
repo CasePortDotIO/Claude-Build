@@ -13,10 +13,12 @@ import { runAutopilotForOrg } from "@/lib/agent/autopilot";
  *   vercel.json: { "path": "/api/jobs/autopilot", "schedule": "0 *\/4 * * *" }
  */
 async function runJob(req: NextRequest) {
+  // Fail CLOSED: this fans out LLM spend + outbound email across orgs, so an
+  // unset secret must lock it, not open it. Vercel Cron attaches the Bearer.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = req.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const orgs = await prisma.org.findMany({

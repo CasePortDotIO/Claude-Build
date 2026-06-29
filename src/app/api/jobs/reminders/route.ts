@@ -12,10 +12,11 @@ import { sendDueReminders, sweepNoShows } from "@/lib/agent/reminders";
  *   vercel.json: { "path": "/api/jobs/reminders", "schedule": "0 * * * *" }
  */
 async function runJob(req: NextRequest) {
+  // Fail CLOSED: an unset secret must lock this endpoint, not open it.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = req.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const orgs = await prisma.org.findMany({ where: { type: "CLIENT" }, select: { id: true } });
