@@ -185,6 +185,7 @@ export function Sidebar({
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
+                      aria-current={active ? "page" : undefined}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
                         active ? "bg-charcoal-soft text-white" : "text-on-dark-soft hover:bg-[#1d2125] hover:text-white"
                       }`}
