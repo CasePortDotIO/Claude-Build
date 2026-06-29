@@ -157,6 +157,15 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+// Platform integration credentials set in-app (Settings → Integrations) instead
+// of env vars — so connecting Stripe/email/etc. is a few clicks, no redeploy.
+// Values are encrypted at rest; reads fall back to the matching env var.
+model AppConfig {
+  key       String   @id
+  valueEnc  String
+  updatedAt DateTime @updatedAt
+}
+
 // Fixed-window rate limiter (e.g. login attempts per IP/email). Keyed by an
 // arbitrary string; count resets when the window rolls over.
 model RateLimit {

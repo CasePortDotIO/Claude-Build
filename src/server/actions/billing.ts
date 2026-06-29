@@ -22,7 +22,7 @@ export async function startCheckoutAction(): Promise<BillingActionResult> {
   } catch {
     return { ok: false, error: "Only an admin can manage billing." };
   }
-  if (!isBillingConfigured()) return { ok: false, error: "Billing isn't enabled yet." };
+  if (!(await isBillingConfigured())) return { ok: false, error: "Billing isn't enabled yet." };
 
   try {
     const org = await prisma.org.findUniqueOrThrow({
@@ -55,7 +55,7 @@ export async function openBillingPortalAction(): Promise<BillingActionResult> {
   } catch {
     return { ok: false, error: "Only an admin can manage billing." };
   }
-  if (!isBillingConfigured()) return { ok: false, error: "Billing isn't enabled yet." };
+  if (!(await isBillingConfigured())) return { ok: false, error: "Billing isn't enabled yet." };
 
   const org = await prisma.org.findUniqueOrThrow({ where: { id: ctx.orgId }, select: { stripeCustomerId: true } });
   if (!org.stripeCustomerId) return { ok: false, error: "No billing account yet — subscribe first." };

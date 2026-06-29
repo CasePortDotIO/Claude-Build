@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhook } from "@/lib/billing/stripe";
+import { getSecret } from "@/lib/config/secrets";
 
 /**
  * Stripe webhook — keeps Org.billingStatus + subscription fields in sync with the
@@ -30,7 +31,7 @@ async function orgIdFor(sub: { customer?: string; metadata?: { orgId?: string } 
 }
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = await getSecret("STRIPE_WEBHOOK_SECRET");
   if (!secret) return NextResponse.json({ ok: false, error: "webhook not configured" }, { status: 503 });
 
   const raw = await req.text();

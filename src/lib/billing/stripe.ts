@@ -1,28 +1,28 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getSecret } from "@/lib/config/secrets";
 
 /**
  * Stripe via REST (no SDK dependency) — checkout, billing portal, customer
- * creation, and webhook signature verification. Everything is gated on
- * STRIPE_SECRET_KEY + STRIPE_PRICE_ID; when unset the product runs exactly as
- * before and the billing UI shows "not enabled". Same safe-fallback pattern used
- * across the app.
+ * creation, and webhook signature verification. Credentials resolve from the
+ * in-app store (Settings → Integrations) or env; when unset the billing UI shows
+ * "not enabled" and the product runs unchanged.
  */
 const API = "https://api.stripe.com/v1";
 
-export function isBillingConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+export async function isBillingConfigured(): Promise<boolean> {
+  return Boolean((await getSecret("STRIPE_SECRET_KEY")) && (await getSecret("STRIPE_PRICE_ID")));
 }
 
-export function planDisplay(): { name: string; price: string } {
+export async function planDisplay(): Promise<{ name: string; price: string }> {
   return {
-    name: process.env.STRIPE_PLAN_NAME || "The Warm Sweep",
-    price: process.env.STRIPE_PLAN_PRICE_LABEL || "",
+    name: (await getSecret("STRIPE_PLAN_NAME")) || "The Warm Sweep",
+    price: (await getSecret("STRIPE_PLAN_PRICE_LABEL")) || "",
   };
 }
 
-function key(): string {
-  const k = process.env.STRIPE_SECRET_KEY;
-  if (!k) throw new Error("STRIPE_SECRET_KEY is not set");
+async function key(): Promise<string> {
+  const k = await getSecret("STRIPE_SECRET_KEY");
+  if (!k) throw new Error("Stripe is not connected.");
   return k;
 }
 
@@ -37,7 +37,7 @@ function form(params: Record<string, string | number | undefined>): string {
 async function stripePost<T>(path: string, body: string): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key()}`, "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { Authorization: `Bearer ${await key()}`, "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
   const data = await res.json();
@@ -66,7 +66,7 @@ export async function createCheckoutSession(opts: {
   const s = await stripePost<{ url: string }>("/checkout/sessions", form({
     mode: "subscription",
     customer: opts.customerId,
-    "line_items[0][price]": process.env.STRIPE_PRICE_ID,
+    "line_items[0][price]": await getSecret("STRIPE_PRICE_ID"),
     "line_items[0][quantity]": 1,
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
