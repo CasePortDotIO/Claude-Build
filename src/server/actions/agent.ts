@@ -193,10 +193,11 @@ export async function rejectDraftAction(raw: unknown): Promise<AgentActionResult
   return { ok: true, message: "Draft rejected." };
 }
 
-export async function approveAllAction(): Promise<AgentActionResult> {
+export async function approveAllAction(opts?: { draftIds?: string[] }): Promise<AgentActionResult> {
   const ctx = await requireOrg();
+  const ids = opts?.draftIds;
   const pending = await prisma.draft.findMany({
-    where: { orgId: ctx.orgId, status: "PENDING_APPROVAL" },
+    where: { orgId: ctx.orgId, status: "PENDING_APPROVAL", ...(ids && ids.length ? { id: { in: ids } } : {}) },
     include: { variants: true },
   });
 
@@ -224,5 +225,32 @@ export async function approveAllAction(): Promise<AgentActionResult> {
 
   revalidatePath("/approvals");
   revalidatePath("/leads");
-  return { ok: true, message: `Approved all ${approved} pending draft(s).` };
+  return { ok: true, message: `Approved ${approved} draft(s).` };
+}
+
+/** Reject a set of drafts at once (multi-select bulk action). */
+export async function bulkRejectAction(opts: { draftIds: string[] }): Promise<AgentActionResult> {
+  const ctx = await requireOrg();
+  if (!opts.draftIds?.length) return { ok: false, error: "Nothing selected." };
+
+  const drafts = await prisma.draft.findMany({
+    where: { orgId: ctx.orgId, status: "PENDING_APPROVAL", id: { in: opts.draftIds } },
+    select: { id: true, leadId: true },
+  });
+
+  let rejected = 0;
+  for (const d of drafts) {
+    await prisma.$transaction([
+      prisma.draft.update({ where: { id: d.id }, data: { status: "REJECTED" } }),
+      prisma.lead.update({ where: { id: d.leadId }, data: { status: "RESEARCHED" } }),
+      prisma.auditLog.create({
+        data: { orgId: ctx.orgId, actorId: ctx.userId, action: "draft.reject", targetType: "Draft", targetId: d.id },
+      }),
+    ]);
+    rejected += 1;
+  }
+
+  revalidatePath("/approvals");
+  revalidatePath("/leads");
+  return { ok: true, message: `Rejected ${rejected} draft(s).` };
 }

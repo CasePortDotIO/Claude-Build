@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { approveDraftAction, rejectDraftAction, approveAllAction } from "@/server/actions/agent";
+import { approveDraftAction, rejectDraftAction, approveAllAction, bulkRejectAction } from "@/server/actions/agent";
 import { toast } from "@/components/ui/Toast";
 import { Kbd } from "@/components/ui/Kbd";
 
@@ -42,6 +42,7 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
   const [cleared, setCleared] = useState<Set<string>>(new Set());
   const [exitingId, setExitingId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(drafts[0]?.id ?? null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Editor state (lifted into the parent so keyboard shortcuts can drive it).
   const [variantId, setVariantId] = useState<string>("");
@@ -126,6 +127,22 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
     });
   }
 
+  function toggleSelect(id: string) {
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  function bulkAct(kind: "approve" | "reject") {
+    const ids = [...selected].filter((id) => !cleared.has(id));
+    if (ids.length === 0) return;
+    setCleared((c) => { const n = new Set(c); ids.forEach((i) => n.add(i)); return n; });
+    setSelected(new Set());
+    startTransition(async () => {
+      const r = kind === "approve" ? await approveAllAction({ draftIds: ids }) : await bulkRejectAction({ draftIds: ids });
+      toast(r.message ?? (kind === "approve" ? "Approved" : "Rejected"), "success");
+      router.refresh();
+    });
+  }
+
   // Single global key handler reading the latest state via a ref (no stale
   // closures, no re-binding on every keystroke).
   const h = useRef({ visible, active, variantId, subject, body, approve, reject, cycleVariant });
@@ -148,6 +165,7 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
         case "a": e.preventDefault(); s.approve(s.active, s.variantId, s.subject, s.body); break;
         case "r": e.preventDefault(); s.reject(s.active); break;
         case "e": e.preventDefault(); bodyRef.current?.focus(); break;
+        case "x": e.preventDefault(); toggleSelect(s.active.id); break;
         case "[": e.preventDefault(); s.cycleVariant(-1); break;
         case "]": e.preventDefault(); s.cycleVariant(1); break;
       }
@@ -171,44 +189,68 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
   }
 
   const activeIdx = visible.findIndex((d) => d.id === active.id);
+  const selectedCount = visible.filter((d) => selected.has(d.id)).length;
 
   return (
     <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[320px_1fr]">
       {/* queue list */}
       <div className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
-        <div className="flex items-center justify-between border-b border-line-2 bg-cream-head px-4 py-3">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">
-            {visible.length} awaiting you
-          </span>
-          <button
-            onClick={approveAll}
-            className="rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white hover:opacity-90"
-          >
-            Approve all
-          </button>
-        </div>
+        {selectedCount > 0 ? (
+          <div className="flex items-center justify-between gap-2 border-b border-line-2 bg-charcoal px-4 py-2.5">
+            <span className="text-[11.5px] font-semibold text-white">{selectedCount} selected</span>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => bulkAct("approve")} className="rounded-md bg-sweep-light px-2.5 py-1 text-[11.5px] font-semibold text-charcoal hover:opacity-90">Approve</button>
+              <button onClick={() => bulkAct("reject")} className="rounded-md border border-[#3a3f45] px-2.5 py-1 text-[11.5px] font-semibold text-on-dark-soft hover:bg-charcoal-soft">Reject</button>
+              <button onClick={() => setSelected(new Set())} className="px-1.5 text-[11.5px] text-on-dark-mute hover:text-on-dark">Clear</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between border-b border-line-2 bg-cream-head px-4 py-3">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">
+              {visible.length} awaiting you
+            </span>
+            <button
+              onClick={approveAll}
+              className="rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white hover:opacity-90"
+            >
+              Approve all
+            </button>
+          </div>
+        )}
         <div className="max-h-[60vh] overflow-y-auto">
           {visible.map((d) => {
             const on = d.id === active.id;
+            const picked = selected.has(d.id);
             const best = d.variants.find((v) => v.id === d.selectedVariantId) ?? d.variants[0];
             return (
-              <button
+              <div
                 key={d.id}
-                onClick={() => setActiveId(d.id)}
-                aria-current={on || undefined}
-                className={`relative block w-full overflow-hidden border-b border-line-2 px-4 py-3 pl-5 text-left last:border-b-0 transition-colors ${
-                  exitingId === d.id ? "animate-wsExit" : ""
-                } ${on ? "bg-cream" : "hover:bg-cream-head"}`}
+                className={`group relative overflow-hidden border-b border-line-2 last:border-b-0 ${exitingId === d.id ? "animate-wsExit" : ""}`}
               >
-                {on && <span className="absolute left-0 top-0 h-full w-[3px] bg-sweep" />}
-                <div className="flex items-center justify-between gap-2">
-                  <p className="m-0 truncate text-[14px] font-semibold text-ink">{d.leadName}</p>
-                  {best && (
-                    <span className="flex-none font-mono text-[10.5px] text-muted-3">{Math.round(best.confidence * 100)}%</span>
-                  )}
-                </div>
-                <p className="m-0 truncate text-[12px] text-muted-3">{d.leadEmail}</p>
-              </button>
+                <button
+                  onClick={() => setActiveId(d.id)}
+                  aria-current={on || undefined}
+                  className={`relative block w-full px-4 py-3 pl-5 pr-9 text-left transition-colors ${on ? "bg-cream" : "hover:bg-cream-head"}`}
+                >
+                  {on && <span className="absolute left-0 top-0 h-full w-[3px] bg-sweep" />}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="m-0 truncate text-[14px] font-semibold text-ink">{d.leadName}</p>
+                    {best && (
+                      <span className="flex-none font-mono text-[10.5px] text-muted-3">{Math.round(best.confidence * 100)}%</span>
+                    )}
+                  </div>
+                  <p className="m-0 truncate text-[12px] text-muted-3">{d.leadEmail}</p>
+                </button>
+                <input
+                  type="checkbox"
+                  checked={picked}
+                  onChange={() => toggleSelect(d.id)}
+                  aria-label={`Select ${d.leadName}`}
+                  className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 cursor-pointer accent-sweep transition-opacity ${
+                    picked ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  }`}
+                />
+              </div>
             );
           })}
         </div>
@@ -304,6 +346,7 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
           <span className="flex items-center gap-1"><Kbd>A</Kbd> approve</span>
           <span className="flex items-center gap-1"><Kbd>R</Kbd> reject</span>
           <span className="flex items-center gap-1"><Kbd>E</Kbd> edit</span>
+          <span className="flex items-center gap-1"><Kbd>X</Kbd> select</span>
           <span className="flex items-center gap-1"><Kbd>[</Kbd><Kbd>]</Kbd> angle</span>
         </div>
       </div>
