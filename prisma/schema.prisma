@@ -86,6 +86,7 @@ model Org {
   mailingAddress String?
 
   memberships  Membership[]
+  invitations  Invitation[]
   leads        Lead[]
   leadImports  LeadImport[]
   suppressions SuppressionEntry[]
@@ -147,6 +148,24 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// A pending invitation for someone to join an org with a given role. Only the
+// token hash is stored; the raw token lives in the emailed accept link.
+model Invitation {
+  id          String    @id @default(cuid())
+  orgId       String
+  org         Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email       String
+  role        Role      @default(MEMBER)
+  tokenHash   String    @unique
+  invitedById String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([orgId, email])
+  @@index([orgId])
 }
 
 // Single-use, expiring tokens for account email flows (password reset + email
