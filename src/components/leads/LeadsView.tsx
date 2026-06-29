@@ -153,9 +153,9 @@ export function LeadsView({
       <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[1.5fr_1fr]">
         {/* table */}
         <div className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
-          <div className="grid grid-cols-[1.6fr_0.9fr_1fr] gap-3 border-b border-line-2 bg-cream-head px-[22px] py-3.5">
+          <div className="grid grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_0.9fr_1fr] gap-3 border-b border-line-2 bg-cream-head px-[22px] py-3.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">Contact</span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">Draft</span>
+            <span className="hidden text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3 sm:block">Draft</span>
             <span className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">Status</span>
           </div>
           {leads.map((l) => {
@@ -166,7 +166,7 @@ export function LeadsView({
                 key={l.id}
                 onClick={() => setSelectedId(l.id)}
                 aria-current={on || undefined}
-                className={`relative grid w-full grid-cols-[1.6fr_0.9fr_1fr] items-center gap-3 border-b border-line-2 px-[22px] py-3.5 pl-6 text-left last:border-b-0 transition-colors ${
+                className={`relative grid w-full grid-cols-[1.6fr_1fr] sm:grid-cols-[1.6fr_0.9fr_1fr] items-center gap-3 border-b border-line-2 px-[22px] py-3.5 pl-6 text-left last:border-b-0 transition-colors ${
                   on ? "bg-cream" : "hover:bg-cream-head"
                 }`}
               >
@@ -175,7 +175,7 @@ export function LeadsView({
                   <p className="m-0 mb-0.5 truncate text-[14.5px] font-semibold text-ink">{fullName(l)}</p>
                   <p className="m-0 truncate text-[12px] text-muted-3">cold {l.coldFor}</p>
                 </div>
-                <span className="text-[12px] text-muted">
+                <span className="hidden text-[12px] text-muted sm:block">
                   {d ? <span className="font-semibold text-sweep">{Math.round(d.confidence * 100)}%</span> : "—"}
                 </span>
                 <div><StatusBadge status={l.status} /></div>

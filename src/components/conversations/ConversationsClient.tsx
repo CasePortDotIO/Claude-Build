@@ -177,7 +177,7 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
                   {out ? "Agent → lead" : m.isBounce ? "Bounce" : m.isAutoReply ? "Auto-reply" : "Lead → you"}
                 </span>
                 <div
-                  className={`max-w-[80%] whitespace-pre-line rounded-2xl px-4 py-3 text-[13.5px] leading-[1.55] ${
+                  className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-[13.5px] leading-[1.55] sm:max-w-[75%] ${
                     out ? "self-end bg-sweep text-white" : "self-start border border-line bg-white text-ink-soft"
                   }`}
                 >

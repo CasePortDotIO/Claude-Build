@@ -192,7 +192,7 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
   const selectedCount = visible.filter((d) => selected.has(d.id)).length;
 
   return (
-    <div className="grid grid-cols-1 items-start gap-[18px] lg:grid-cols-[320px_1fr]">
+    <div className="grid grid-cols-1 items-start gap-[18px] md:grid-cols-[280px_1fr] lg:grid-cols-[320px_1fr]">
       {/* queue list */}
       <div className="overflow-hidden rounded-xl2 border border-line bg-white shadow-card">
         {selectedCount > 0 ? (
