@@ -13,9 +13,17 @@ const TTL_MS: Record<AuthTokenType, number> = {
   EMAIL_VERIFY: 24 * 60 * 60 * 1000, // 24 hours
 };
 
-function hash(raw: string): string {
+/** SHA-256 hex of a raw token — what we persist (never the raw value). */
+export function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
+
+/** A fresh 256-bit URL-safe token (returned once, embedded in an emailed link). */
+export function newRawToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+const hash = hashToken;
 
 /** Create a token, invalidating any prior unused tokens of the same type. */
 export async function createAuthToken(userId: string, type: AuthTokenType): Promise<string> {

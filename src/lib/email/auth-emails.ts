@@ -16,6 +16,18 @@ export async function sendPasswordResetEmail(to: string, rawToken: string) {
   return sendTransactionalEmail({ to, subject: "Reset your Warm Sweep password", html, text });
 }
 
+export async function sendInviteEmail(opts: { to: string; orgName: string; inviterName?: string | null; rawToken: string }) {
+  const url = `${baseUrl()}/invite/${opts.rawToken}`;
+  const who = opts.inviterName ? `${opts.inviterName} invited you` : "You've been invited";
+  const { html, text } = renderEmail({
+    heading: `Join ${opts.orgName} on The Warm Sweep`,
+    intro: `${who} to join ${opts.orgName}'s workspace — where the agent revives cold leads and books calls. Accept to get access.`,
+    cta: { label: "Accept invitation", url },
+    outro: "This invite expires in 7 days.",
+  });
+  return sendTransactionalEmail({ to: opts.to, subject: `Join ${opts.orgName} on The Warm Sweep`, html, text });
+}
+
 export async function sendVerificationEmail(to: string, rawToken: string) {
   const url = `${baseUrl()}/api/auth/verify?token=${rawToken}`;
   const { html, text } = renderEmail({
