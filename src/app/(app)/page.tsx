@@ -10,6 +10,7 @@ import { MorningBrief } from "@/components/magic/MorningBrief";
 import { GuaranteeTracker } from "@/components/magic/GuaranteeTracker";
 import { ReactivationsChart } from "@/components/dashboard/ReactivationsChart";
 import { SampleDataBanner } from "@/components/dashboard/SampleDataBanner";
+import { LoadSampleDataPrompt } from "@/components/dashboard/LoadSampleDataPrompt";
 import { SAMPLE_SOURCE } from "@/lib/sample/seed";
 import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
@@ -49,6 +50,9 @@ export default async function CommandCenter() {
       <div className="ws-rise flex-1 px-4 pb-[60px] pt-[30px] sm:px-6 lg:px-[34px]">
         {/* Alive-from-zero: frame the seeded sample data + offer the next steps */}
         {hasSample && <SampleDataBanner />}
+
+        {/* Empty workspace (no real leads, no samples) — offer one-click explore */}
+        {!hasSample && firstRun.leadCount === 0 && <LoadSampleDataPrompt />}
 
         {/* M9: the payoff moment — a fresh booking lands loud */}
         {celebrate && (
