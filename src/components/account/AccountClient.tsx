@@ -15,10 +15,12 @@ export function AccountClient({
   orgName,
   billingStatus,
   canceled,
+  stripeManaged = false,
 }: {
   orgName: string;
   billingStatus: string;
   canceled: boolean;
+  stripeManaged?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -45,7 +47,9 @@ export function AccountClient({
         </p>
       </div>
 
-      {canceled ? (
+      {/* When Stripe manages billing, the portal (BillingSection) handles
+          cancel/reactivate — hide the manual self-serve controls. */}
+      {stripeManaged ? null : canceled ? (
         <div className="rounded-xl2 border border-line bg-white p-6">
           <p className="m-0 mb-1.5 font-heading text-[16px] font-semibold text-ink">Reactivate your workspace</p>
           <p className="m-0 mb-4 max-w-[520px] text-[13.5px] leading-[1.55] text-muted">

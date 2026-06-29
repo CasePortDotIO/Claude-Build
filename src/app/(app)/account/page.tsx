@@ -4,13 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { Topbar } from "@/components/nav/Topbar";
 import { AccountClient } from "@/components/account/AccountClient";
 import { TeamSection, type MemberVM, type InviteVM } from "@/components/account/TeamSection";
+import { BillingSection } from "@/components/account/BillingSection";
+import { isBillingConfigured, planDisplay } from "@/lib/billing/stripe";
 
 export default async function AccountPage() {
   const ctx = await requireOrg();
   const [org, memberships, invites] = await Promise.all([
     prisma.org.findUniqueOrThrow({
       where: { id: ctx.orgId },
-      select: { name: true, brandName: true, billingStatus: true, canceledAt: true },
+      select: { name: true, brandName: true, billingStatus: true, canceledAt: true, stripeSubscriptionId: true, currentPeriodEnd: true },
     }),
     prisma.membership.findMany({
       where: { orgId: ctx.orgId },
@@ -21,6 +23,8 @@ export default async function AccountPage() {
   ]);
 
   const isAdmin = ROLE_RANK[ctx.role] >= ROLE_RANK.CLIENT_ADMIN;
+  const billingOn = isBillingConfigured();
+  const plan = planDisplay();
   const members: MemberVM[] = memberships.map((m) => ({
     userId: m.user.id,
     name: m.user.name,
@@ -38,7 +42,18 @@ export default async function AccountPage() {
           orgName={org.brandName || org.name}
           billingStatus={org.billingStatus}
           canceled={org.billingStatus === "canceled"}
+          stripeManaged={billingOn}
         />
+        {billingOn && (
+          <BillingSection
+            hasSubscription={Boolean(org.stripeSubscriptionId)}
+            billingStatus={org.billingStatus}
+            planName={plan.name}
+            priceLabel={plan.price}
+            renewsOn={org.currentPeriodEnd ? org.currentPeriodEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null}
+            isAdmin={isAdmin}
+          />
+        )}
         <TeamSection members={members} invites={inviteVMs} isAdmin={isAdmin} />
       </div>
     </>
