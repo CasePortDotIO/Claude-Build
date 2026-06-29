@@ -41,6 +41,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen w-full bg-parchment text-ink">
+      {/* Keyboard users can jump past the nav straight to the page content. */}
+      <a
+        href="#main-content"
+        className="sr-only z-[200] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:rounded-lg focus:bg-sweep focus:px-4 focus:py-2 focus:text-[13px] focus:font-semibold focus:text-white"
+      >
+        Skip to content
+      </a>
       <Sidebar
         userName={ctx.name ?? ctx.email}
         orgName={org?.brandName || org?.name || "Workspace"}
@@ -50,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         activeOrgId={ctx.orgId}
         isAgencyAdmin={isAgencyAdmin}
       />
-      <main className="ws-scroll flex min-w-0 flex-1 flex-col">{children}</main>
+      <main id="main-content" tabIndex={-1} className="ws-scroll flex min-w-0 flex-1 flex-col outline-none">{children}</main>
       <CommandPalette isAgencyAdmin={isAgencyAdmin} />
       <Toaster />
     </div>

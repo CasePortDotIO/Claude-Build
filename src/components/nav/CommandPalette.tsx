@@ -92,6 +92,7 @@ export function CommandPalette({ isAgencyAdmin = false }: { isAgencyAdmin?: bool
     >
       <div
         role="dialog"
+        aria-modal="true"
         aria-label="Command menu"
         className="ws-rise w-full max-w-[560px] overflow-hidden rounded-xl2 border border-line bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
