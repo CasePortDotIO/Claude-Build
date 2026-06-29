@@ -15,3 +15,12 @@ export const signInSchema = z.object({
 });
 
 export type SignInInput = z.infer<typeof signInSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Invalid reset link"),
+  password: z.string().min(8, "Use at least 8 characters").max(200),
+});

@@ -7,7 +7,7 @@ import { signUpAction, signInAction, type ActionState } from "@/server/actions/a
 
 const initial: ActionState = {};
 
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+export function AuthForm({ mode, notice = null }: { mode: "sign-in" | "sign-up"; notice?: string | null }) {
   const router = useRouter();
   const action = mode === "sign-up" ? signUpAction : signInAction;
   const [state, formAction, pending] = useActionState(action, initial);
@@ -35,6 +35,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </p>
       </div>
 
+      {notice && (
+        <div className="mb-4 rounded-lg border border-[rgba(27,122,87,0.25)] bg-sweep-mist px-4 py-3 text-[13px] text-sweep">
+          {notice}
+        </div>
+      )}
+
       <form action={formAction} className="rounded-xl2 border border-line bg-white p-7 shadow-pop">
         {state.error && (
           <div className="mb-4 rounded-lg border border-[#f0d2c9] bg-[#fbf0ec] px-4 py-3 text-[13px] text-[#a14a2c]">
@@ -55,6 +61,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           type="password"
           placeholder={mode === "sign-up" ? "At least 8 characters" : "Your password"}
         />
+
+        {mode === "sign-in" && (
+          <div className="-mt-1 mb-4 text-right">
+            <Link href="/forgot-password" className="text-[12.5px] font-semibold text-muted hover:text-sweep hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+        )}
 
         <button
           type="submit"
