@@ -15,7 +15,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Runtime queries use the pooled connection (DATABASE_URL) — right for
+  // serverless. Migrations use a DIRECT (non-pooled) connection (DIRECT_URL) so
+  // `prisma migrate deploy` can take its advisory lock reliably; through the
+  // pgbouncer pooler that lock intermittently times out on cold compute. The
+  // vercel-build script falls back to DATABASE_URL when DIRECT_URL is unset, so
+  // builds never break before the env var is configured.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
