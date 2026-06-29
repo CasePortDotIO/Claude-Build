@@ -66,8 +66,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* ── Form side ────────────────────────────────────────────────────── */}
-      <main className="flex w-full flex-1 items-center justify-center bg-parchment px-6 py-12">
+      <main className="relative flex w-full flex-1 items-center justify-center bg-parchment px-6 py-12">
         {children}
+        <p className="absolute bottom-5 left-0 right-0 text-center text-[12px] text-muted-2">
+          <a href="/privacy" className="hover:text-sweep hover:underline">Privacy</a>
+          <span className="mx-2">·</span>
+          <a href="/terms" className="hover:text-sweep hover:underline">Terms</a>
+        </p>
       </main>
     </div>
   );

@@ -21,10 +21,11 @@ import { emailMorningBrief } from "@/lib/agent/digest";
  *   so both verbs are handled. External schedulers can POST with the same header.
  */
 async function runJob(req: NextRequest) {
+  // Fail CLOSED: an unset secret must lock this endpoint, not open it.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = req.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const orgs = await prisma.org.findMany({ where: { type: "CLIENT" }, select: { id: true } });

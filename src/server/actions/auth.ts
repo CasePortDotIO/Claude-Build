@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signInSchema, signUpSchema, forgotPasswordSchema, resetPasswordSchema } from "@/lib/zod/org";
 import { signIn } from "@/lib/auth";
-import { seedSampleData } from "@/lib/sample/seed";
 import { createAuthToken, consumeAuthToken } from "@/lib/auth/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email/auth-emails";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
@@ -66,13 +65,9 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     return org.id;
   });
 
-  // Alive-from-zero: seed clearly-labeled sample data so every screen is
-  // explorable on first login. Never let a seeding hiccup block sign-up.
-  try {
-    await seedSampleData({ orgId, operatorName: name });
-  } catch (err) {
-    console.error("sample seed failed (non-fatal):", err);
-  }
+  // New workspaces start EMPTY — real users never see fabricated leads/bookings
+  // or sample numbers in their KPIs. Sample data is opt-in only, via the
+  // "Load sample data" button on the empty Command Center.
 
   // Send a verification email (non-blocking — they can use the app meanwhile).
   try {
