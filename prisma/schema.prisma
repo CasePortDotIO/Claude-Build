@@ -66,7 +66,7 @@ model Org {
   // M8 per-seat billing (what the agency charges this client).
   clientPriceCents Int    @default(0)
   seats            Int    @default(1)
-  billingStatus    String @default("active") // active | trial | past_due | paused | canceled
+  billingStatus    String @default("incomplete") // incomplete | active | trial | past_due | paused | canceled
   canceledAt       DateTime? // §9 self-serve cancellation timestamp
 
   // §10 customer-type / vertical tag (set at onboarding), for privacy-clean

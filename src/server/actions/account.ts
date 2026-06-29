@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireOrg } from "@/lib/auth-helpers";
 import { getMailboxProvider, getReadyContext } from "@/lib/mailbox";
+import { isBillingConfigured } from "@/lib/billing/stripe";
 
 export interface AccountActionResult {
   ok: boolean;
@@ -30,6 +31,11 @@ async function emailOperator(orgId: string, to: string, subject: string, body: s
  */
 export async function cancelSubscriptionAction(): Promise<AccountActionResult> {
   const ctx = await requireOrg();
+  // When Stripe is live, billing state is owned by Stripe — cancel through the
+  // billing portal so the real subscription (and access) actually changes.
+  if (await isBillingConfigured()) {
+    return { ok: false, error: "Manage your subscription from the billing portal in Account." };
+  }
   await prisma.org.update({ where: { id: ctx.orgId }, data: { billingStatus: "canceled", canceledAt: new Date() } });
   await prisma.auditLog.create({
     data: { orgId: ctx.orgId, actorId: ctx.userId, action: "subscription.cancel", targetType: "Org", targetId: ctx.orgId },
@@ -58,6 +64,11 @@ export async function cancelSubscriptionAction(): Promise<AccountActionResult> {
 /** Reverse a cancellation in one click — no friction coming back. */
 export async function reactivateSubscriptionAction(): Promise<AccountActionResult> {
   const ctx = await requireOrg();
+  // Never grant paid access for free when Stripe is live — reactivation must go
+  // through Checkout/portal so an actual subscription exists.
+  if (await isBillingConfigured()) {
+    return { ok: false, error: "Start your subscription from the billing page to reactivate." };
+  }
   await prisma.org.update({ where: { id: ctx.orgId }, data: { billingStatus: "active", canceledAt: null } });
   await prisma.auditLog.create({
     data: { orgId: ctx.orgId, actorId: ctx.userId, action: "subscription.reactivate", targetType: "Org", targetId: ctx.orgId },

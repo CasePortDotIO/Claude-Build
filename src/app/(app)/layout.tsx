@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { requireOrg } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { orgScoped } from "@/lib/tenancy";
+import { isBillingConfigured, subscriptionActive } from "@/lib/billing/stripe";
 import { resolveBranding } from "@/lib/branding";
 import { listMemberships } from "@/server/actions/org";
 import { Sidebar } from "@/components/nav/Sidebar";
@@ -24,12 +26,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [org, pendingDrafts, needsReview, memberships] = await Promise.all([
     prisma.org.findUnique({
       where: { id: ctx.orgId },
-      select: { name: true, brandName: true, brandColor: true, type: true, parentAgencyId: true },
+      select: { name: true, brandName: true, brandColor: true, type: true, parentAgencyId: true, billingStatus: true },
     }),
     db.draft.count({ where: { status: "PENDING_APPROVAL" } }),
     prisma.conversation.count({ where: { orgId: ctx.orgId, status: "NEEDS_REVIEW" } }),
     listMemberships(ctx.userId),
   ]);
+
+  // Paid-only: once billing is configured, a workspace without an active
+  // subscription is walled behind /billing (which lives outside this layout).
+  // When billing isn't configured (local/dev/pre-setup), the app stays open so
+  // the operator can connect Stripe in the first place.
+  if (org && !subscriptionActive(org.billingStatus) && (await isBillingConfigured())) {
+    redirect("/billing");
+  }
 
   // White-label: resolve the brand the current user should see for the active org.
   const agency = org?.parentAgencyId
