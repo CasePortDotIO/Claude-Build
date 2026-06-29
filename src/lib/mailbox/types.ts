@@ -49,6 +49,8 @@ export interface MailboxProvider {
   // --- OAuth (real providers) ---
   getAuthUrl?(state: string): string;
   exchangeCode?(code: string): Promise<OAuthTokens>;
+  // Exchange a refresh token for a fresh access token (real providers only).
+  refresh?(refreshToken: string): Promise<{ accessToken: string; expiry?: Date }>;
 
   // --- Send ---
   send(ctx: MailboxContext, email: OutboundEmail): Promise<SendResult>;

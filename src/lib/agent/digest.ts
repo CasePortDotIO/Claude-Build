@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
+import { getMailboxProvider, getReadyContext } from "@/lib/mailbox";
 import { formatMoney } from "@/lib/format";
 import type { DailyBrief } from "@/lib/retention";
 
@@ -39,7 +39,7 @@ export async function emailMorningBrief(orgId: string, brief: DailyBrief, streak
   let emailed = 0;
   for (const to of recipients) {
     try {
-      await provider.send(mailboxContext(mailbox), { to, subject, body });
+      await provider.send(await getReadyContext(mailbox), { to, subject, body });
       emailed += 1;
     } catch {
       // best-effort per recipient

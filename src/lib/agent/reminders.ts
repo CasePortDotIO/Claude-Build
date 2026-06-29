@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getMailboxProvider, mailboxContext } from "@/lib/mailbox";
+import { getMailboxProvider, getReadyContext } from "@/lib/mailbox";
 
 /**
  * §6 no-show defense. A "booked call" that no-shows is junk that triggers
@@ -34,7 +34,7 @@ async function emailAttendee(orgId: string, to: string, subject: string, body: s
   const mailbox = await prisma.mailbox.findFirst({ where: { orgId, status: "CONNECTED" }, orderBy: { createdAt: "asc" } });
   if (!mailbox) return false;
   try {
-    await getMailboxProvider(mailbox.provider).send(mailboxContext(mailbox), { to, subject, body });
+    await getMailboxProvider(mailbox.provider).send(await getReadyContext(mailbox), { to, subject, body });
     return true;
   } catch {
     return false;
