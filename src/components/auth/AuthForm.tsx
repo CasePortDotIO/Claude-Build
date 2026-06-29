@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signUpAction, signInAction, type ActionState } from "@/server/actions/auth";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 const initial: ActionState = {};
 
@@ -75,7 +76,7 @@ export function AuthForm({ mode, notice = null }: { mode: "sign-in" | "sign-up";
           disabled={pending}
           className="mt-2 w-full rounded-lg bg-ember px-5 py-3 font-heading text-[15px] font-semibold text-white hover:bg-ember-hover disabled:opacity-60"
         >
-          {pending ? "Please wait…" : mode === "sign-up" ? "Create workspace →" : "Sign in →"}
+          {pending ? <SpinnerLabel>Please wait…</SpinnerLabel> : mode === "sign-up" ? "Create workspace →" : "Sign in →"}
         </button>
       </form>
 

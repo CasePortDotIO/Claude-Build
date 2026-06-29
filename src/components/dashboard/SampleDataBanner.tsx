@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { clearSampleDataAction } from "@/server/actions/sample";
 import { toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 /**
  * Alive-from-zero onboarding banner. Shown while a workspace still has the
@@ -49,7 +50,7 @@ export function SampleDataBanner() {
           disabled={pending}
           className="rounded-lg border border-line-3 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-muted hover:bg-cream disabled:opacity-60"
         >
-          {pending ? "Clearing…" : "Clear sample data"}
+          {pending ? <SpinnerLabel>Clearing…</SpinnerLabel> : "Clear sample data"}
         </button>
       </div>
     </div>

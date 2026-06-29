@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendDraftAction, sendAllApprovedAction } from "@/server/actions/mailbox";
 import { toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 export interface ReadyItem {
   draftId: string;
@@ -42,7 +43,7 @@ export function ReadyToSend({ items, hasMailbox }: { items: ReadyItem[]; hasMail
           onClick={() => run(() => sendAllApprovedAction())}
           className="rounded-lg bg-sweep px-4 py-2.5 font-heading text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "Sending…" : "Send all"}
+          {pending ? <SpinnerLabel>Sending…</SpinnerLabel> : "Send all"}
         </button>
       </div>
       <div className="flex flex-col gap-2">

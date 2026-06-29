@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { loadSampleDataAction } from "@/server/actions/sample";
 import { toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 /**
  * Shown on an empty workspace (no real leads, no samples) — lets the operator
@@ -40,7 +41,7 @@ export function LoadSampleDataPrompt() {
         disabled={pending}
         className="flex-none self-start rounded-lg border border-line-3 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-ink hover:bg-cream disabled:opacity-60 sm:self-center"
       >
-        {pending ? "Loading…" : "Load sample data"}
+        {pending ? <SpinnerLabel>Loading…</SpinnerLabel> : "Load sample data"}
       </button>
     </div>
   );

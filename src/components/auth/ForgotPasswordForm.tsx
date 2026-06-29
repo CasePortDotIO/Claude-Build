@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { requestPasswordResetAction, type ActionState } from "@/server/actions/auth";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 const initial: ActionState = {};
 
@@ -44,7 +45,7 @@ export function ForgotPasswordForm() {
             disabled={pending}
             className="w-full rounded-lg bg-ember px-5 py-3 font-heading text-[15px] font-semibold text-white hover:bg-ember-hover disabled:opacity-60"
           >
-            {pending ? "Sending…" : "Send reset link →"}
+            {pending ? <SpinnerLabel>Sending…</SpinnerLabel> : "Send reset link →"}
           </button>
         </form>
       )}

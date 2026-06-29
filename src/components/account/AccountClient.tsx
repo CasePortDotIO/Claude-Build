@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelSubscriptionAction, reactivateSubscriptionAction } from "@/server/actions/account";
 import { toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 /**
  * §9 self-serve account controls. Cancellation is one click, with a single plain
@@ -61,7 +62,7 @@ export function AccountClient({
             onClick={() => run(reactivateSubscriptionAction)}
             className="rounded-lg bg-sweep px-5 py-3 font-heading text-[14px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {pending ? "Reactivating…" : "Reactivate — one click"}
+            {pending ? <SpinnerLabel>Reactivating…</SpinnerLabel> : "Reactivate — one click"}
           </button>
         </div>
       ) : (
@@ -82,7 +83,7 @@ export function AccountClient({
                 onClick={() => run(cancelSubscriptionAction)}
                 className="rounded-lg bg-[#b43c3c] px-4 py-2.5 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
               >
-                {pending ? "Canceling…" : "Yes, cancel"}
+                {pending ? <SpinnerLabel>Canceling…</SpinnerLabel> : "Yes, cancel"}
               </button>
               <button onClick={() => setConfirming(false)} className="rounded-lg border border-line-3 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-muted hover:bg-cream">
                 Keep it

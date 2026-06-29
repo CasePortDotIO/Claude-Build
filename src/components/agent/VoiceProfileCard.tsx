@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { learnVoiceAction, editVoiceProfileAction } from "@/server/actions/agent";
 import { toast, toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 export interface VoiceVM {
   tone: string;
@@ -98,7 +99,7 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
             className="mb-3 w-full resize-y rounded-lg border border-line-3 bg-cream px-4 py-3 font-sans text-[13.5px] leading-[1.6] outline-none focus:border-sweep"
           />
           <button disabled={pending} onClick={learn} className="rounded-lg bg-sweep px-5 py-3 font-heading text-[14px] font-semibold text-white hover:opacity-90 disabled:opacity-60">
-            {pending ? "Learning…" : "Learn my voice →"}
+            {pending ? <SpinnerLabel>Learning…</SpinnerLabel> : "Learn my voice →"}
           </button>
         </div>
       ) : mode === "edit" ? (
@@ -114,7 +115,7 @@ export function VoiceProfileCard({ voice }: { voice: VoiceVM }) {
             </div>
           ))}
           <button disabled={pending} onClick={save} className="mt-2 self-start rounded-lg bg-sweep px-5 py-2.5 font-heading text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60">
-            {pending ? "Saving…" : "Save profile"}
+            {pending ? <SpinnerLabel>Saving…</SpinnerLabel> : "Save profile"}
           </button>
         </div>
       ) : (
