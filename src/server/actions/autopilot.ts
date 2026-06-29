@@ -21,6 +21,7 @@ export async function setAutopilotAction(opts: {
   sync?: boolean;
   draft?: boolean;
   send?: boolean;
+  approve?: boolean;
 }): Promise<AutopilotActionResult> {
   const ctx = await requireOrg();
   try {
@@ -35,6 +36,7 @@ export async function setAutopilotAction(opts: {
       ...(opts.sync !== undefined ? { autopilotSync: opts.sync } : {}),
       ...(opts.draft !== undefined ? { autopilotDraft: opts.draft } : {}),
       ...(opts.send !== undefined ? { autopilotSend: opts.send } : {}),
+      ...(opts.approve !== undefined ? { autopilotApprove: opts.approve } : {}),
     },
   });
 

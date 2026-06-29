@@ -5,6 +5,7 @@ import { prisma, withDbRetry } from "@/lib/prisma";
 import { requireOrg } from "@/lib/auth-helpers";
 import { learnVoice } from "@/lib/agent/voice";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
+import { autoApproveAndSend } from "@/lib/agent/autosend";
 import {
   learnVoiceSchema,
   generateDraftsSchema,
@@ -84,17 +85,32 @@ export async function generateDraftsAction(raw: unknown): Promise<AgentActionRes
     }
   }
 
-  revalidatePath("/approvals");
-  revalidatePath("/leads");
-  revalidatePath("/");
-
   // Don't disguise a backend failure as success: if nothing was drafted and the
   // skips were unexpected errors (not eligibility guards), report it so the
   // button surfaces the problem instead of silently doing nothing.
   if (generated === 0 && hadUnexpectedError) {
+    revalidatePath("/approvals");
+    revalidatePath("/leads");
+    revalidatePath("/");
     return { ok: false, generated, skipped, error: `Couldn't generate drafts: ${skipped[0]?.reason ?? "server error"}` };
   }
-  return { ok: true, generated, skipped, message: `Drafted ${generated} lead(s); skipped ${skipped.length}.` };
+
+  // Auto-send mode: if the operator turned off the approval requirement, send
+  // the confident ones now (low-confidence still waits in the queue).
+  const org = await prisma.org.findUnique({ where: { id: ctx.orgId }, select: { autopilotApprove: true } });
+  let autoMsg = "";
+  if (org?.autopilotApprove && generated > 0) {
+    const res = await withDbRetry(() => autoApproveAndSend({ orgId: ctx.orgId, leadIds: parsed.data.leadIds }));
+    if (res.sent > 0 || res.heldForReview > 0) {
+      autoMsg = ` Auto-sent ${res.sent}${res.heldForReview > 0 ? `, ${res.heldForReview} held for review` : ""}.`;
+    }
+  }
+
+  revalidatePath("/approvals");
+  revalidatePath("/leads");
+  revalidatePath("/conversations");
+  revalidatePath("/");
+  return { ok: true, generated, skipped, message: `Drafted ${generated} lead(s); skipped ${skipped.length}.${autoMsg}` };
 }
 
 // ── Approval queue ───────────────────────────────────────────────────────────

@@ -118,6 +118,7 @@ model Org {
   autopilotSync  Boolean @default(false) // poll connected lead sources on a schedule → ingest fresh leads
   autopilotDraft Boolean @default(false) // auto-draft fresh NEW leads (queued for approval; never auto-sent unreviewed)
   autopilotSend  Boolean @default(false) // auto-send drafts a human ALREADY approved (approval gate preserved)
+  autopilotApprove Boolean @default(false) // auto-APPROVE + send high-confidence drafts (skips the queue; low-confidence still waits)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
