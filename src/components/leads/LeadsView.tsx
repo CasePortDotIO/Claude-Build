@@ -9,6 +9,7 @@ import { generateDraftsAction } from "@/server/actions/agent";
 import { eraseLeadAction } from "@/server/actions/compliance";
 import { toast, toastResult } from "@/components/ui/Toast";
 import { Kbd } from "@/components/ui/Kbd";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { LeadStatus } from "@prisma/client";
 
 // Serializable shape passed from the server page (no Date objects).
@@ -63,7 +64,19 @@ export function LeadsView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(leads[0]?.id ?? null);
+  const [confirmErase, setConfirmErase] = useState(false);
   const selected = leads.find((l) => l.id === selectedId) ?? null;
+
+  function eraseSelected() {
+    if (!selected) return;
+    const id = selected.id;
+    setConfirmErase(false);
+    startTransition(async () => {
+      toastResult(await eraseLeadAction(id), "Erased");
+      setSelectedId(null);
+      router.refresh();
+    });
+  }
 
   const draftableIds = leads.filter((l) => ELIGIBLE.has(l.status) && !drafts[l.id]).map((l) => l.id);
 
@@ -219,14 +232,7 @@ export function LeadsView({
                 </a>
                 <button
                   disabled={pending}
-                  onClick={() => {
-                    if (!confirm(`Permanently erase ${fullName(selected)} and all their data? Their email stays on do-not-contact.`)) return;
-                    startTransition(async () => {
-                      toastResult(await eraseLeadAction(selected.id), "Erased");
-                      setSelectedId(null);
-                      router.refresh();
-                    });
-                  }}
+                  onClick={() => setConfirmErase(true)}
                   className="text-[12px] font-semibold text-[#e08b8b] hover:underline disabled:opacity-60"
                 >
                   Erase (GDPR)
@@ -244,6 +250,16 @@ export function LeadsView({
         <span className="flex items-center gap-1"><Kbd>J</Kbd><Kbd>K</Kbd> move between leads</span>
         <span className="flex items-center gap-1"><Kbd>G</Kbd> generate draft for selected</span>
       </div>
+
+      <ConfirmDialog
+        open={confirmErase}
+        title="Erase this lead?"
+        body={`Permanently erase ${selected ? fullName(selected) : "this lead"} and all their data. Their email stays on your do-not-contact list. This can't be undone.`}
+        confirmLabel="Erase permanently"
+        danger
+        onConfirm={eraseSelected}
+        onCancel={() => setConfirmErase(false)}
+      />
     </>
   );
 }
