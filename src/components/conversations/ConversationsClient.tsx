@@ -26,6 +26,7 @@ export interface ConversationVM {
   status: string; // ConversationStatus
   leadStatus: string;
   reviewReason: string | null; // §5: why this thread needs careful attention
+  isDemo: boolean; // simulated mailbox — show the reply-preview controls (hidden on real threads)
   booking: { whenLabel: string; meetingUrl: string | null } | null;
   lastSnippet: string;
   when: string;
@@ -219,12 +220,14 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
               startTransition={startTransition}
               onDone={(m) => { toast(m); router.refresh(); }}
             />
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12.5px] text-muted-2">Demo the reply loop:</span>
-              <SimBtn disabled={pending} onClick={() => simulate("positive")}>Positive reply</SimBtn>
-              <SimBtn disabled={pending} onClick={() => simulate("optout")}>Opt-out</SimBtn>
-              <SimBtn disabled={pending} onClick={() => simulate("bounce")}>Bounce</SimBtn>
-            </div>
+            {active.isDemo && (
+              <div className="flex flex-wrap items-center gap-2 border-t border-line-2 pt-3">
+                <span className="text-[12px] text-muted-3">Preview how the agent reacts (demo thread):</span>
+                <SimBtn disabled={pending} onClick={() => simulate("positive")}>They reply “interested”</SimBtn>
+                <SimBtn disabled={pending} onClick={() => simulate("optout")}>They opt out</SimBtn>
+                <SimBtn disabled={pending} onClick={() => simulate("bounce")}>It bounces</SimBtn>
+              </div>
+            )}
           </div>
         )}
       </div>

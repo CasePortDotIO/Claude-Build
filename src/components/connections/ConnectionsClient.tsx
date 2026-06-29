@@ -85,8 +85,8 @@ export function ConnectionsClient({
               Connect
             </a>
           ) : (
-            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Set GOOGLE_CLIENT_ID/SECRET to enable">
-              Needs OAuth keys
+            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Direct Gmail connection isn't enabled for this workspace yet — use the demo mailbox below to run the full loop.">
+              Not available yet
             </span>
           )}
         </Card>
@@ -98,16 +98,16 @@ export function ConnectionsClient({
               Connect
             </a>
           ) : (
-            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Set MICROSOFT_CLIENT_ID/SECRET to enable">
-              Needs OAuth keys
+            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Direct Outlook connection isn't enabled for this workspace yet — use the demo mailbox below to run the full loop.">
+              Not available yet
             </span>
           )}
         </Card>
       </div>
 
-      <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Demo / offline</p>
+      <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Just exploring? Try a demo mailbox</p>
       <div className="mb-7 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <Card mono="◎" monoBg="#1B7A57" name="Simulated mailbox" desc="Run the full send + reply loop with no Google account" status={statusFor(mailboxes, "SIMULATION")}>
+        <Card mono="◎" monoBg="#1B7A57" name="Demo mailbox" desc="Run the full send + reply loop without connecting a real inbox" status={statusFor(mailboxes, "SIMULATION")}>
           {statusFor(mailboxes, "SIMULATION") === "Connected" ? (
             <button
               disabled={pending}
@@ -135,14 +135,14 @@ export function ConnectionsClient({
 
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Calendar &amp; booking</p>
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <Card mono="C" monoBg="#1a1a1a" name="Cal.com" desc="Offer real slots & book the call" status={calConnected && calendar?.provider === "CALCOM" ? "Connected" : "Set CALCOM_* / API key"}>
+        <Card mono="C" monoBg="#1a1a1a" name="Cal.com" desc="Offer real slots & book the call" status={calConnected && calendar?.provider === "CALCOM" ? "Connected" : "Not connected"}>
           <button
             disabled={pending}
             onClick={() => run(() => connectSimulationCalendarAction())}
             className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
-            title="Demo: connect a simulated calendar"
+            title="Connect a demo calendar to try booking real-looking time slots"
           >
-            {calConnected ? "Reconnect (sim)" : "Connect (sim)"}
+            {calConnected ? "Reconnect demo" : "Use a demo calendar"}
           </button>
         </Card>
         <Card mono="◷" monoBg="#0a1f3c" name="Calendly" desc="Offer slots; invitee self-books (webhook)" status={calConnected && calendar?.provider === "CALENDLY" ? "Connected" : "Use the booking link below"}>

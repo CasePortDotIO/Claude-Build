@@ -20,6 +20,7 @@ export default async function ConversationsPage() {
       lead: { select: { firstName: true, lastName: true, email: true, status: true } },
       messages: { orderBy: { createdAt: "asc" } },
       booking: { select: { startsAt: true, meetingUrl: true } },
+      mailbox: { select: { provider: true } },
     },
   });
 
@@ -35,6 +36,7 @@ export default async function ConversationsPage() {
       status: c.status,
       leadStatus: c.lead.status,
       reviewReason: c.reviewReason,
+      isDemo: c.mailbox.provider === "SIMULATION",
       booking: c.booking
         ? {
             whenLabel: c.booking.startsAt.toLocaleString("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
