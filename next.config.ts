@@ -15,6 +15,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["@prisma/client", "bcryptjs"],
+  compress: true,
+  // Tree-shake barrel imports so only the used members ship to the client.
+  experimental: {
+    optimizePackageImports: ["zod"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
