@@ -132,7 +132,7 @@ export async function simulateReplyAction(opts: {
 /** Pull new replies for real Gmail mailboxes (no-op for simulation). */
 export async function syncMailboxesAction(): Promise<MailboxActionResult> {
   const ctx = await requireOrg();
-  if (!hasGoogleOAuth()) return { ok: true, message: "No live mailbox to sync. Use Simulate reply for the demo." };
+  if (!(await hasGoogleOAuth())) return { ok: true, message: "No live mailbox to sync. Use Simulate reply for the demo." };
 
   const mailboxes = await prisma.mailbox.findMany({ where: { orgId: ctx.orgId, status: "CONNECTED", provider: "GMAIL" } });
   let ingested = 0;

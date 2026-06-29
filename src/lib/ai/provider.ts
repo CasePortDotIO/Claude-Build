@@ -1,4 +1,4 @@
-import { aiConfig, hasAnthropic } from "@/lib/ai/config";
+import { getAiConfig, hasAnthropic } from "@/lib/ai/config";
 import { callToolUse } from "@/lib/ai/anthropic";
 import {
   buildDraftSystemPrompt,
@@ -47,11 +47,14 @@ interface RawVoiceToolInput {
 
 class AnthropicProvider implements LLMProvider {
   readonly name = "anthropic";
-  readonly model = aiConfig.anthropic.model;
+  // Interface-required sync default for display; the live model is resolved per
+  // call from getAiConfig() (in-app store → env) so it reflects connected config.
+  readonly model = "claude-opus-4-8";
 
   async draftReengagement(input: DraftInput): Promise<DraftResult> {
+    const model = (await getAiConfig()).anthropic.model;
     const { input: out, usage } = await callToolUse<RawDraftToolInput>({
-      model: this.model,
+      model,
       system: buildDraftSystemPrompt(input),
       userContent: buildDraftUserPrompt(input),
       tool: draftToolSchema(input.variantCount),
@@ -69,13 +72,14 @@ class AnthropicProvider implements LLMProvider {
       overallRationale: out.overall_rationale,
       usage,
       provider: this.name,
-      model: this.model,
+      model,
     };
   }
 
   async draftReply(input: ReplyDraftInput): Promise<DraftResult> {
+    const model = (await getAiConfig()).anthropic.model;
     const { input: out, usage } = await callToolUse<RawDraftToolInput>({
-      model: this.model,
+      model,
       system: buildReplySystemPrompt(input),
       userContent: buildReplyUserPrompt(input),
       tool: draftToolSchema(input.variantCount),
@@ -93,13 +97,14 @@ class AnthropicProvider implements LLMProvider {
       overallRationale: out.overall_rationale,
       usage,
       provider: this.name,
-      model: this.model,
+      model,
     };
   }
 
   async learnVoice(input: VoiceLearnInput): Promise<VoiceLearnResult> {
+    const model = (await getAiConfig()).anthropic.model;
     const { input: out, usage } = await callToolUse<RawVoiceToolInput>({
-      model: this.model,
+      model,
       system: buildVoiceLearnSystemPrompt(),
       userContent: buildVoiceLearnUserPrompt(input),
       tool: voiceToolSchema(),
@@ -326,16 +331,19 @@ export class StubProvider implements LLMProvider {
 }
 
 // ── factory ─────────────────────────────────────────────────────────────────
-let cached: LLMProvider | null = null;
+// Re-evaluates each call (getSecret is cached ~30s) so connecting an Anthropic
+// key in-app takes effect without a redeploy; instances are memoized per kind.
+let anthropicProvider: AnthropicProvider | null = null;
+let stubProvider: StubProvider | null = null;
 
-export function getLLMProvider(): LLMProvider {
-  if (cached) return cached;
-  cached = hasAnthropic() ? new AnthropicProvider() : new StubProvider();
-  return cached;
+export async function getLLMProvider(): Promise<LLMProvider> {
+  if (await hasAnthropic()) return (anthropicProvider ??= new AnthropicProvider());
+  return (stubProvider ??= new StubProvider());
 }
 
 export function __resetProvider() {
-  cached = null;
+  anthropicProvider = null;
+  stubProvider = null;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

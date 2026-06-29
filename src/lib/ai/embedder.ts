@@ -1,4 +1,4 @@
-import { EMBED_DIM, aiConfig, hasVoyage } from "@/lib/ai/config";
+import { EMBED_DIM, getAiConfig, hasVoyage } from "@/lib/ai/config";
 
 /**
  * Embedder abstraction (§2/§4). Reasoning/copy uses Claude; embeddings use
@@ -21,13 +21,14 @@ function l2normalize(v: number[]): number[] {
 class VoyageEmbedder implements Embedder {
   readonly name = "voyage";
   async embed(texts: string[]): Promise<number[][]> {
+    const { voyage } = await getAiConfig();
     const res = await fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${aiConfig.voyage.apiKey}`,
+        authorization: `Bearer ${voyage.apiKey}`,
       },
-      body: JSON.stringify({ input: texts, model: aiConfig.voyage.model }),
+      body: JSON.stringify({ input: texts, model: voyage.model }),
     });
     if (!res.ok) {
       throw new Error(`Voyage embeddings failed: ${res.status} ${await res.text()}`);
@@ -80,16 +81,21 @@ export class HashEmbedder implements Embedder {
   }
 }
 
-let cached: Embedder | null = null;
+let voyageEmbedder: VoyageEmbedder | null = null;
+let hashEmbedder: HashEmbedder | null = null;
 
-/** The active embedder: Voyage if keyed, else the deterministic local one. */
-export function getEmbedder(): Embedder {
-  if (cached) return cached;
-  cached = hasVoyage() ? new VoyageEmbedder() : new HashEmbedder();
-  return cached;
+/**
+ * The active embedder: Voyage if keyed, else the deterministic local one.
+ * Re-evaluates each call (getSecret is cached ~30s) so connecting a Voyage key
+ * in-app takes effect without a redeploy; instances are memoized per kind.
+ */
+export async function getEmbedder(): Promise<Embedder> {
+  if (await hasVoyage()) return (voyageEmbedder ??= new VoyageEmbedder());
+  return (hashEmbedder ??= new HashEmbedder());
 }
 
 // Test seam: reset the memoized embedder (used in unit tests).
 export function __resetEmbedder() {
-  cached = null;
+  voyageEmbedder = null;
+  hashEmbedder = null;
 }

@@ -36,6 +36,42 @@ const PROVIDERS: Provider[] = [
       { key: "EMAIL_FROM", label: "From address", placeholder: "The Warm Sweep <hi@yourdomain.com>" },
     ],
   },
+  {
+    id: "gmail",
+    name: "Mailbox — Gmail / Google",
+    blurb: "Let your team connect Gmail mailboxes for outreach (the OAuth app credentials).",
+    statusKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+    help: "Google Cloud Console → APIs & Services → Credentials → OAuth client (Web). Enable the Gmail API, and add the authorized redirect URI: <your-domain>/api/connections/gmail/callback.",
+    fields: [
+      { key: "GOOGLE_CLIENT_ID", label: "Client ID", placeholder: "…apps.googleusercontent.com" },
+      { key: "GOOGLE_CLIENT_SECRET", label: "Client secret", placeholder: "GOCSPX-…", secret: true },
+    ],
+  },
+  {
+    id: "microsoft",
+    name: "Mailbox — Outlook / Microsoft",
+    blurb: "Let your team connect Outlook / Microsoft 365 mailboxes for outreach.",
+    statusKeys: ["MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"],
+    help: "Azure Portal → App registrations → your app. Add the redirect URI: <your-domain>/api/connections/microsoft/callback, and grant Mail.Send / Mail.Read / User.Read.",
+    fields: [
+      { key: "MICROSOFT_CLIENT_ID", label: "Application (client) ID", placeholder: "00000000-0000-…" },
+      { key: "MICROSOFT_CLIENT_SECRET", label: "Client secret value", placeholder: "secret value", secret: true },
+    ],
+  },
+  {
+    id: "ai",
+    name: "AI — Claude & Voyage",
+    blurb: "Power drafting & replies with Claude and retrieval with Voyage. Without keys, a deterministic local fallback is used.",
+    statusKeys: ["ANTHROPIC_API_KEY"],
+    help: "Anthropic Console → API Keys for Claude. Voyage AI dashboard for embeddings (optional). Model names are optional — sensible defaults are used.",
+    fields: [
+      { key: "ANTHROPIC_API_KEY", label: "Anthropic API key", placeholder: "sk-ant-…", secret: true },
+      { key: "ANTHROPIC_MODEL", label: "Model (optional)", placeholder: "claude-opus-4-8" },
+      { key: "ANTHROPIC_MODEL_FAST", label: "Fast model (optional)", placeholder: "claude-haiku-4-5-20251001" },
+      { key: "VOYAGE_API_KEY", label: "Voyage API key (optional)", placeholder: "pa-…", secret: true },
+      { key: "VOYAGE_MODEL", label: "Voyage model (optional)", placeholder: "voyage-3" },
+    ],
+  },
 ];
 
 export function IntegrationsSection({ status, isAdmin }: { status: Status; isAdmin: boolean }) {

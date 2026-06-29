@@ -12,10 +12,10 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.activeOrgId) return NextResponse.redirect(new URL("/sign-in", process.env.NEXTAUTH_URL));
   const ret = req.nextUrl.searchParams.get("return") === "welcome" ? "welcome" : undefined;
   const fallback = ret === "welcome" ? "/welcome" : "/connections";
-  if (!hasGoogleOAuth()) {
+  if (!(await hasGoogleOAuth())) {
     return NextResponse.redirect(new URL(`${fallback}?error=google_not_configured`, process.env.NEXTAUTH_URL));
   }
   const state = Buffer.from(JSON.stringify({ orgId: session.user.activeOrgId, ret })).toString("base64url");
-  const url = new GmailProvider().getAuthUrl(state);
+  const url = await new GmailProvider().getAuthUrl(state);
   return NextResponse.redirect(url);
 }

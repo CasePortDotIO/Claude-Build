@@ -3,28 +3,44 @@
 // The whole engine runs with OR without API keys: when keys are present we use
 // Anthropic (reasoning/copy) + Voyage (embeddings); when absent we fall back to
 // deterministic local providers so the app stays fully demoable and testable.
+// Keys resolve from the in-app encrypted store first, then env (lib/config/
+// secrets) — so an admin can connect AI in a few clicks without a redeploy.
 // Secrets are read here, server-side only — never exported to the client.
+
+import { getSecret } from "@/lib/config/secrets";
 
 export const EMBED_DIM = 1024; // voyage-3 output dimension
 
-export const aiConfig = {
-  anthropic: {
-    apiKey: process.env.ANTHROPIC_API_KEY ?? "",
-    model: process.env.ANTHROPIC_MODEL || "claude-opus-4-8",
-    fastModel: process.env.ANTHROPIC_MODEL_FAST || "claude-haiku-4-5-20251001",
-  },
-  voyage: {
-    apiKey: process.env.VOYAGE_API_KEY ?? "",
-    model: process.env.VOYAGE_MODEL || "voyage-3",
-  },
-};
-
-export function hasAnthropic(): boolean {
-  return aiConfig.anthropic.apiKey.length > 0;
+export interface AiConfig {
+  anthropic: { apiKey: string; model: string; fastModel: string };
+  voyage: { apiKey: string; model: string };
 }
 
-export function hasVoyage(): boolean {
-  return aiConfig.voyage.apiKey.length > 0;
+/** Resolve AI config (in-app store first, then env). Async — reads getSecret. */
+export async function getAiConfig(): Promise<AiConfig> {
+  const [aKey, aModel, aFast, vKey, vModel] = await Promise.all([
+    getSecret("ANTHROPIC_API_KEY"),
+    getSecret("ANTHROPIC_MODEL"),
+    getSecret("ANTHROPIC_MODEL_FAST"),
+    getSecret("VOYAGE_API_KEY"),
+    getSecret("VOYAGE_MODEL"),
+  ]);
+  return {
+    anthropic: {
+      apiKey: aKey ?? "",
+      model: aModel || "claude-opus-4-8",
+      fastModel: aFast || "claude-haiku-4-5-20251001",
+    },
+    voyage: { apiKey: vKey ?? "", model: vModel || "voyage-3" },
+  };
+}
+
+export async function hasAnthropic(): Promise<boolean> {
+  return Boolean(await getSecret("ANTHROPIC_API_KEY"));
+}
+
+export async function hasVoyage(): Promise<boolean> {
+  return Boolean(await getSecret("VOYAGE_API_KEY"));
 }
 
 // Indicative Anthropic pricing (USD per 1M tokens) for cost logging in

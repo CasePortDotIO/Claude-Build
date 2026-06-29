@@ -26,7 +26,7 @@ export interface StoreMemoryInput {
 
 /** Embed `content` and persist it as an org-scoped memory chunk. Returns the id. */
 export async function storeMemory(input: StoreMemoryInput): Promise<string> {
-  const [embedding] = await getEmbedder().embed([input.content]);
+  const [embedding] = await (await getEmbedder()).embed([input.content]);
 
   // Create the row without the vector (Prisma can't write the Unsupported
   // column), then set the embedding via raw SQL.
@@ -53,7 +53,7 @@ export async function storeMemory(input: StoreMemoryInput): Promise<string> {
 /** Batch variant — embeds all contents in one provider call, then stores them. */
 export async function storeMemoryBatch(inputs: StoreMemoryInput[]): Promise<string[]> {
   if (inputs.length === 0) return [];
-  const embeddings = await getEmbedder().embed(inputs.map((i) => i.content));
+  const embeddings = await (await getEmbedder()).embed(inputs.map((i) => i.content));
   const ids: string[] = [];
   for (let i = 0; i < inputs.length; i++) {
     const input = inputs[i];
@@ -100,7 +100,7 @@ export interface RetrieveOptions {
  */
 export async function retrieveSimilar(opts: RetrieveOptions): Promise<RetrievedMemory[]> {
   const { orgId, query, k = 5, kinds, leadId } = opts;
-  const [qvec] = await getEmbedder().embed([query]);
+  const [qvec] = await (await getEmbedder()).embed([query]);
 
   // Build a positional-parameter query. $1 = vector, $2 = orgId, then filters.
   const params: unknown[] = [toVectorLiteral(qvec), orgId];

@@ -5,12 +5,13 @@ import { SimulationProvider } from "@/lib/mailbox/simulation";
 import { MicrosoftGraphProvider, hasMicrosoftOAuth } from "@/lib/mailbox/microsoft";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { prisma } from "@/lib/prisma";
+import { getSecret } from "@/lib/config/secrets";
 
 export * from "@/lib/mailbox/types";
 export { hasMicrosoftOAuth };
 
-export function hasGoogleOAuth(): boolean {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+export async function hasGoogleOAuth(): Promise<boolean> {
+  return Boolean((await getSecret("GOOGLE_CLIENT_ID")) && (await getSecret("GOOGLE_CLIENT_SECRET")));
 }
 
 /** Resolve a provider implementation for a mailbox kind. */
