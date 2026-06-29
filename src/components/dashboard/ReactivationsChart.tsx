@@ -58,7 +58,7 @@ export function ReactivationsChart({ bars }: { bars: ChartBar[] }) {
           </div>
 
           {/* bars */}
-          <div className="relative flex items-end gap-3" style={{ height: PLOT }}>
+          <div className="relative flex items-end gap-3" style={{ height: PLOT }} role="group" aria-label="Calls booked per day, last 7 days">
             {bars.map((b, i) => {
               const today = i === bars.length - 1;
               const on = hover === i;
@@ -66,9 +66,14 @@ export function ReactivationsChart({ bars }: { bars: ChartBar[] }) {
               return (
                 <div
                   key={i}
-                  className="group relative flex h-full flex-1 cursor-default items-end"
+                  tabIndex={0}
+                  role="img"
+                  aria-label={`${today ? "Today" : b.day}: ${b.value} booked`}
+                  className="group relative flex h-full flex-1 cursor-default items-end rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sweep focus-visible:ring-offset-2"
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(null)}
+                  onFocus={() => setHover(i)}
+                  onBlur={() => setHover(null)}
                 >
                   {/* tooltip */}
                   {on && (

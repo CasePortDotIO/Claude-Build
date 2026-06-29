@@ -128,6 +128,7 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
               <button
                 key={c.id}
                 onClick={() => setActiveId(c.id)}
+                aria-current={on || undefined}
                 className={`relative flex w-full gap-3 border-b border-line-2 px-5 py-3.5 pl-6 text-left last:border-b-0 transition-colors ${on ? "bg-cream" : "hover:bg-cream-head"}`}
               >
                 {on && <span className="absolute left-0 top-0 h-full w-[3px] bg-sweep" />}
