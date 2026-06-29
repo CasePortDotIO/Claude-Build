@@ -143,9 +143,26 @@ model User {
   image         String?
 
   memberships Membership[]
+  authTokens  AuthToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Single-use, expiring tokens for account email flows (password reset + email
+// verification). Only the SHA-256 hash of the token is stored; the raw token
+// lives only in the emailed link.
+model AuthToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // "PASSWORD_RESET" | "EMAIL_VERIFY"
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
 }
 
 // A user's membership in an org, with a role. The join is the unit of access.

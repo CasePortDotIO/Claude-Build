@@ -2,9 +2,11 @@
 
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { signInSchema, signUpSchema } from "@/lib/zod/org";
+import { signInSchema, signUpSchema, forgotPasswordSchema, resetPasswordSchema } from "@/lib/zod/org";
 import { signIn } from "@/lib/auth";
 import { seedSampleData } from "@/lib/sample/seed";
+import { createAuthToken, consumeAuthToken } from "@/lib/auth/tokens";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email/auth-emails";
 
 function slugify(name: string): string {
   return (
@@ -66,8 +68,50 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     console.error("sample seed failed (non-fatal):", err);
   }
 
+  // Send a verification email (non-blocking — they can use the app meanwhile).
+  try {
+    const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (u) await sendVerificationEmail(email, await createAuthToken(u.id, "EMAIL_VERIFY"));
+  } catch (err) {
+    console.error("verification email failed (non-fatal):", err);
+  }
+
   // signIn with redirect handled by the caller's redirect on success.
   await signIn("credentials", { email, password, redirect: false });
+  return { ok: true };
+}
+
+/**
+ * Request a password reset. Always reports success — never reveal whether an
+ * email is registered (anti-enumeration). Only sends a link if the account
+ * exists and has a password (not an OAuth-only account).
+ */
+export async function requestPasswordResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email }, select: { id: true, passwordHash: true } });
+  if (user?.passwordHash) {
+    try {
+      const token = await createAuthToken(user.id, "PASSWORD_RESET");
+      await sendPasswordResetEmail(parsed.data.email, token);
+    } catch (err) {
+      console.error("password reset email failed:", err);
+    }
+  }
+  return { ok: true };
+}
+
+/** Complete a password reset using a valid, unexpired, single-use token. */
+export async function resetPasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = resetPasswordSchema.safeParse({ token: formData.get("token"), password: formData.get("password") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+
+  const userId = await consumeAuthToken(parsed.data.token, "PASSWORD_RESET");
+  if (!userId) return { error: "This reset link is invalid or has expired. Request a new one." };
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   return { ok: true };
 }
 
