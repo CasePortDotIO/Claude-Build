@@ -72,7 +72,8 @@ export function ClientsClient({ clients }: { clients: ClientVM[] }) {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl2 border border-line bg-white">
+      <div className="overflow-x-auto rounded-xl2 border border-line bg-white">
+        <div className="min-w-[560px]">
         <div className="grid grid-cols-[1.5fr_1fr_0.7fr_0.7fr_0.8fr] gap-3 border-b border-line-2 bg-cream-head px-[22px] py-3.5">
           {["Client", "Recovered", "Calls", "Leads", "Status"].map((h) => (
             <span key={h} className="text-[11px] font-semibold uppercase tracking-[0.8px] text-muted-3">{h}</span>
@@ -129,6 +130,7 @@ export function ClientsClient({ clients }: { clients: ClientVM[] }) {
             </div>
           ))
         )}
+        </div>
       </div>
     </div>
   );

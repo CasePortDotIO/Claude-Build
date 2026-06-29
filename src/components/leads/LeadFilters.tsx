@@ -57,7 +57,7 @@ export function LeadFilters({ active, query }: { active: string; query: string }
           </button>
         );
       })}
-      <div className="relative ml-auto w-[260px]">
+      <div className="relative w-full md:ml-auto md:w-[260px]">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a3a299" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
           <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
         </svg>

@@ -64,7 +64,7 @@ export function DeliverabilityClient({
               value={addr}
               onChange={(e) => setAddr(e.target.value)}
               placeholder="123 Main St, Austin, TX 78701"
-              className="min-w-[280px] flex-1 rounded-lg border border-[#e6d3bf] bg-white px-3 py-2 text-[13.5px] outline-none focus:border-ember"
+              className="w-full flex-1 rounded-lg border border-[#e6d3bf] bg-white px-3 py-2 text-[13.5px] outline-none focus:border-ember sm:min-w-[280px]"
             />
             <button disabled={pending || !addr} onClick={() => run(() => setMailingAddressAction(addr))} className="rounded-lg bg-ember px-4 py-2 text-[13px] font-semibold text-white hover:bg-ember-hover disabled:opacity-50">
               Save address
@@ -124,12 +124,12 @@ export function DeliverabilityClient({
           <p className="m-0 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">
             Suppression list · {suppressionCount}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="suppress an email…"
-              className="w-[220px] rounded-lg border border-line-3 bg-white px-3 py-1.5 text-[13px] outline-none focus:border-sweep"
+              className="w-full rounded-lg border border-line-3 bg-white px-3 py-1.5 text-[13px] outline-none focus:border-sweep sm:w-[220px]"
             />
             <button disabled={pending || !email} onClick={() => run(async () => { const r = await suppressEmailAction(email); if (r.ok) setEmail(""); return r; })} className="rounded-lg bg-charcoal px-3 py-1.5 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
               Suppress

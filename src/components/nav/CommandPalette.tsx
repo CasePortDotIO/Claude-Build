@@ -87,7 +87,7 @@ export function CommandPalette({ isAgencyAdmin = false }: { isAgencyAdmin?: bool
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-[12vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-[8vh] backdrop-blur-sm sm:pt-[12vh]"
       onClick={() => setOpen(false)}
     >
       <div
