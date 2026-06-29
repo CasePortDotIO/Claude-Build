@@ -28,6 +28,8 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/warmsweep_test?schema=public
+      # Migrations use directUrl; CI's Postgres isn't pooled, so it mirrors DATABASE_URL.
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/warmsweep_test?schema=public
       AUTH_SECRET: ci-not-a-real-secret
       AUTH_TRUST_HOST: "true"
       # No ANTHROPIC/VOYAGE keys → the app uses its deterministic offline stubs.
