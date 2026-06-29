@@ -6,12 +6,13 @@ import type {
   InboundEmail,
   OAuthTokens,
 } from "@/lib/mailbox/types";
+import { getSecret } from "@/lib/config/secrets";
 
 /**
  * Microsoft 365 / Outlook via Microsoft Graph. Used when a MICROSOFT mailbox is
- * connected (MICROSOFT_CLIENT_ID/SECRET configured). OAuth via the Microsoft
- * identity platform; tokens encrypted by the caller. Mirrors the Gmail provider
- * so it slots behind the same MailboxProvider interface.
+ * connected (MICROSOFT_CLIENT_ID/SECRET configured — in-app store or env). OAuth
+ * via the Microsoft identity platform; tokens encrypted by the caller. Mirrors
+ * the Gmail provider so it slots behind the same MailboxProvider interface.
  */
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const SCOPES = ["Mail.Send", "Mail.Read", "User.Read", "offline_access"];
@@ -21,16 +22,16 @@ function redirectUri(): string {
   return `${base}/api/connections/microsoft/callback`;
 }
 
-export function hasMicrosoftOAuth(): boolean {
-  return Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
+export async function hasMicrosoftOAuth(): Promise<boolean> {
+  return Boolean((await getSecret("MICROSOFT_CLIENT_ID")) && (await getSecret("MICROSOFT_CLIENT_SECRET")));
 }
 
 export class MicrosoftGraphProvider implements MailboxProvider {
   readonly kind = "MICROSOFT" as const;
 
-  getAuthUrl(state: string): string {
+  async getAuthUrl(state: string): Promise<string> {
     const params = new URLSearchParams({
-      client_id: process.env.MICROSOFT_CLIENT_ID ?? "",
+      client_id: (await getSecret("MICROSOFT_CLIENT_ID")) ?? "",
       response_type: "code",
       redirect_uri: redirectUri(),
       response_mode: "query",
@@ -45,8 +46,8 @@ export class MicrosoftGraphProvider implements MailboxProvider {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.MICROSOFT_CLIENT_ID ?? "",
-        client_secret: process.env.MICROSOFT_CLIENT_SECRET ?? "",
+        client_id: (await getSecret("MICROSOFT_CLIENT_ID")) ?? "",
+        client_secret: (await getSecret("MICROSOFT_CLIENT_SECRET")) ?? "",
         code,
         redirect_uri: redirectUri(),
         grant_type: "authorization_code",
@@ -72,8 +73,8 @@ export class MicrosoftGraphProvider implements MailboxProvider {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.MICROSOFT_CLIENT_ID ?? "",
-        client_secret: process.env.MICROSOFT_CLIENT_SECRET ?? "",
+        client_id: (await getSecret("MICROSOFT_CLIENT_ID")) ?? "",
+        client_secret: (await getSecret("MICROSOFT_CLIENT_SECRET")) ?? "",
         refresh_token: refreshToken,
         grant_type: "refresh_token",
         scope: SCOPES.join(" "),

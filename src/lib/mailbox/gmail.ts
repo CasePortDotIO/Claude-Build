@@ -6,11 +6,13 @@ import type {
   InboundEmail,
   OAuthTokens,
 } from "@/lib/mailbox/types";
+import { getSecret } from "@/lib/config/secrets";
 
 /**
  * Real Gmail provider (Gmail API + Google OAuth). Used when GOOGLE_CLIENT_ID /
- * GOOGLE_CLIENT_SECRET are configured. Tokens are encrypted before storage by
- * the caller (lib/crypto); this module only handles the wire protocol.
+ * GOOGLE_CLIENT_SECRET are configured (in-app store or env). Tokens are encrypted
+ * before storage by the caller (lib/crypto); this module only handles the wire
+ * protocol.
  *
  * Scopes: gmail.send + gmail.readonly (read replies via history/threads).
  */
@@ -28,9 +30,9 @@ function redirectUri(): string {
 export class GmailProvider implements MailboxProvider {
   readonly kind = "GMAIL" as const;
 
-  getAuthUrl(state: string): string {
+  async getAuthUrl(state: string): Promise<string> {
     const params = new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID ?? "",
+      client_id: (await getSecret("GOOGLE_CLIENT_ID")) ?? "",
       redirect_uri: redirectUri(),
       response_type: "code",
       scope: GMAIL_SCOPES.join(" "),
@@ -47,8 +49,8 @@ export class GmailProvider implements MailboxProvider {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID ?? "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+        client_id: (await getSecret("GOOGLE_CLIENT_ID")) ?? "",
+        client_secret: (await getSecret("GOOGLE_CLIENT_SECRET")) ?? "",
         redirect_uri: redirectUri(),
         grant_type: "authorization_code",
       }),
@@ -76,8 +78,8 @@ export class GmailProvider implements MailboxProvider {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         refresh_token: refreshToken,
-        client_id: process.env.GOOGLE_CLIENT_ID ?? "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+        client_id: (await getSecret("GOOGLE_CLIENT_ID")) ?? "",
+        client_secret: (await getSecret("GOOGLE_CLIENT_SECRET")) ?? "",
         grant_type: "refresh_token",
       }),
     });

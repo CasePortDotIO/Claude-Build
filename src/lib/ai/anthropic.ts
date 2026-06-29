@@ -1,4 +1,4 @@
-import { aiConfig } from "@/lib/ai/config";
+import { getAiConfig } from "@/lib/ai/config";
 
 /**
  * Minimal server-side client for the Anthropic Messages API with forced tool
@@ -25,11 +25,12 @@ export async function callToolUse<T>(opts: {
   tool: { name: string; description: string; input_schema: unknown };
   maxTokens?: number;
 }): Promise<AnthropicToolCallResult<T>> {
+  const cfg = await getAiConfig();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": aiConfig.anthropic.apiKey,
+      "x-api-key": cfg.anthropic.apiKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({

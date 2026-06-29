@@ -46,8 +46,8 @@ export default async function WelcomePage({
       emailLabel={connectedMailbox?.email ?? null}
       calendarConnected={Boolean(connectedCalendar)}
       bookingLink={connectedCalendar?.bookingLink ?? null}
-      googleConfigured={hasGoogleOAuth()}
-      microsoftConfigured={hasMicrosoftOAuth()}
+      googleConfigured={await hasGoogleOAuth()}
+      microsoftConfigured={await hasMicrosoftOAuth()}
       notice={notice}
     />
   );

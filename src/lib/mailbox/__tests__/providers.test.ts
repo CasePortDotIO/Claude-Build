@@ -11,9 +11,9 @@ describe("M7 provider wiring", () => {
     expect(getCalendarProvider("CALENDLY").kind).toBe("CALENDLY");
   });
 
-  it("builds a Microsoft OAuth authorize URL with the right scopes", () => {
+  it("builds a Microsoft OAuth authorize URL with the right scopes", async () => {
     process.env.MICROSOFT_CLIENT_ID = "test-client";
-    const url = new MicrosoftGraphProvider().getAuthUrl("state123");
+    const url = await new MicrosoftGraphProvider().getAuthUrl("state123");
     expect(url).toContain("login.microsoftonline.com");
     expect(url).toContain("Mail.Send");
     expect(decodeURIComponent(url)).toContain("state123");

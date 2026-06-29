@@ -131,7 +131,7 @@ export async function generateDraftsForLead(opts: {
   // request time (bad/expired key, quota, upstream outage), fall back to the
   // deterministic stub so the operator still gets a sendable, grounded draft
   // instead of a dead button. The failure is logged for diagnosis.
-  const provider = getLLMProvider();
+  const provider = await getLLMProvider();
   let result;
   try {
     result = await provider.draftReengagement(input);

@@ -21,7 +21,7 @@ export interface LearnVoiceInput {
  */
 export async function learnVoice(input: LearnVoiceInput) {
   const start = Date.now();
-  const provider = getLLMProvider();
+  const provider = await getLLMProvider();
 
   // 1. Persist raw samples.
   const created = await prisma.$transaction(

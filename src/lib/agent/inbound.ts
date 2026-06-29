@@ -173,7 +173,7 @@ async function draftReplyForApproval(opts: {
     text: m.body,
   }));
 
-  const provider = getLLMProvider();
+  const provider = await getLLMProvider();
   const result = await provider.draftReply({
     lead: { firstName: lead.firstName, company: lead.company, originalInquiry: lead.originalInquiry, statedGoal: lead.statedGoal, toneRead: lead.toneRead, objections: lead.objections ?? [] },
     voice,
