@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { inviteMemberAction, revokeInvitationAction, removeMemberAction } from "@/server/actions/team";
 import { toast, toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 export interface MemberVM { userId: string; name: string | null; email: string; role: Role; isYou: boolean; }
 export interface InviteVM { id: string; email: string; role: Role; }
@@ -60,7 +61,7 @@ export function TeamSection({ members, invites, isAdmin }: { members: MemberVM[]
             disabled={pending || !email.trim()}
             className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {pending ? "Sending…" : "Send invite"}
+            {pending ? <SpinnerLabel>Sending…</SpinnerLabel> : "Send invite"}
           </button>
         </div>
       )}

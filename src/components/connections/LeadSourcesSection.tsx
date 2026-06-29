@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { connectLeadSourceAction, disconnectLeadSourceAction, importFromSourceAction } from "@/server/actions/leadsource";
 import type { LeadSourceKind } from "@prisma/client";
 import { toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 interface SourceDef {
   provider: LeadSourceKind;
@@ -109,7 +110,7 @@ export function LeadSourcesSection({ connected }: { connected: ConnectedSource[]
                     onClick={() => run(async () => { const r = await connectLeadSourceAction({ provider: s.provider, apiKey: apiKey || undefined, config }); if (r.ok) setOpen(null); return r; })}
                     className="rounded-lg bg-sweep px-4 py-2 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
                   >
-                    {pending ? "Connecting…" : apiKey ? "Connect (live)" : "Connect (sample)"}
+                    {pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : apiKey ? "Connect (live)" : "Connect (sample)"}
                   </button>
                 </div>
               )}

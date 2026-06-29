@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { runReflectionAction, applyInsightAction, vetoInsightAction } from "@/server/actions/reflection";
 import { toastResult } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 export interface InsightVM {
   id: string;
@@ -57,7 +58,7 @@ export function SelfImprovement({
             onClick={() => run(() => runReflectionAction())}
             className="rounded-lg bg-charcoal px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {pending ? "Reflecting…" : "Run reflection"}
+            {pending ? <SpinnerLabel>Reflecting…</SpinnerLabel> : "Run reflection"}
           </button>
         </div>
         {ab && ab.treatmentN + ab.holdoutN > 0 ? (

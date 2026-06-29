@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { startCheckoutAction, openBillingPortalAction } from "@/server/actions/billing";
 import { toast } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 /**
  * Stripe billing UI. Only rendered when billing is configured. Subscribe →
@@ -64,7 +65,7 @@ export function BillingSection({
               disabled={pending}
               className="rounded-lg border border-line-3 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-muted hover:bg-cream disabled:opacity-60"
             >
-              {pending ? "Opening…" : "Manage billing"}
+              {pending ? <SpinnerLabel>Opening…</SpinnerLabel> : "Manage billing"}
             </button>
           ) : (
             <button
@@ -72,7 +73,7 @@ export function BillingSection({
               disabled={pending}
               className="rounded-lg bg-sweep px-5 py-2.5 font-heading text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
-              {pending ? "Starting…" : "Subscribe"}
+              {pending ? <SpinnerLabel>Starting…</SpinnerLabel> : "Subscribe"}
             </button>
           )
         )}

@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { acceptInvitationAction } from "@/server/actions/team";
 import { toast } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 export function AcceptInvite({ token, orgName }: { token: string; orgName: string }) {
   const router = useRouter();
@@ -23,7 +24,7 @@ export function AcceptInvite({ token, orgName }: { token: string; orgName: strin
       disabled={pending}
       className="w-full rounded-lg bg-ember px-5 py-3 font-heading text-[15px] font-semibold text-white hover:bg-ember-hover disabled:opacity-60"
     >
-      {pending ? "Joining…" : `Join ${orgName} →`}
+      {pending ? <SpinnerLabel>Joining…</SpinnerLabel> : `Join ${orgName} →`}
     </button>
   );
 }

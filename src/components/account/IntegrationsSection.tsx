@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveIntegrationsAction } from "@/server/actions/integrations";
 import { toast } from "@/components/ui/Toast";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 type Status = Record<string, { set: boolean; source: "app" | "env" | null }>;
 
@@ -147,7 +148,7 @@ function ProviderCard({ provider, status }: { provider: Provider; status: Status
             disabled={pending}
             className="mt-1 self-start rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {pending ? "Saving…" : "Save"}
+            {pending ? <SpinnerLabel>Saving…</SpinnerLabel> : "Save"}
           </button>
         </div>
       )}

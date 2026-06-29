@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { connectSimulationMailboxAction } from "@/server/actions/mailbox";
 import { connectSimulationCalendarAction, setBookingLinkAction } from "@/server/actions/calendar";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 interface Props {
   brandName: string;
@@ -120,7 +121,7 @@ export function OnboardingWizard(props: Props) {
               >
                 <Mono mono="◎" bg="#1B7A57" />
                 <div className="min-w-0 flex-1">
-                  <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? "Connecting…" : "Use a demo mailbox"}</p>
+                  <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Use a demo mailbox"}</p>
                   <p className="m-0 text-[12.5px] text-muted-2">See the whole loop instantly — connect your real inbox anytime.</p>
                 </div>
                 <span className="flex-none rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white">Instant</span>
@@ -149,7 +150,7 @@ export function OnboardingWizard(props: Props) {
               >
                 <Mono mono="C" bg="#1a1a1a" />
                 <div className="min-w-0 flex-1">
-                  <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? "Connecting…" : "Connect a calendar (demo)"}</p>
+                  <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Connect a calendar (demo)"}</p>
                   <p className="m-0 text-[12.5px] text-muted-2">Offers real slots & books the call. Swap in Cal.com / Calendly later.</p>
                 </div>
                 <span className="flex-none rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white">Instant</span>

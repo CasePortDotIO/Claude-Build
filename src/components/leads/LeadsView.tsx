@@ -10,6 +10,7 @@ import { eraseLeadAction } from "@/server/actions/compliance";
 import { toast, toastResult } from "@/components/ui/Toast";
 import { Kbd } from "@/components/ui/Kbd";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 import type { LeadStatus } from "@prisma/client";
 
 // Serializable shape passed from the server page (no Date objects).
@@ -142,7 +143,7 @@ export function LeadsView({
           onClick={() => generate(draftableIds)}
           className="rounded-lg bg-ember px-4 py-2.5 font-heading text-[13px] font-semibold text-white hover:bg-ember-hover disabled:opacity-50"
         >
-          {pending ? "Drafting…" : `Generate drafts for ${draftableIds.length} eligible`}
+          {pending ? <SpinnerLabel>Drafting…</SpinnerLabel> : `Generate drafts for ${draftableIds.length} eligible`}
         </button>
         <Link href="/approvals" className="text-[13px] font-semibold text-sweep hover:underline">
           Review approvals →
@@ -308,7 +309,7 @@ function NextMessage({
           onClick={onGenerate}
           className="rounded-lg bg-sweep-light px-3.5 py-2 text-[12.5px] font-semibold text-charcoal hover:opacity-90 disabled:opacity-60"
         >
-          {pending ? "Drafting…" : "Generate draft"}
+          {pending ? <SpinnerLabel>Drafting…</SpinnerLabel> : "Generate draft"}
         </button>
       )}
     </div>

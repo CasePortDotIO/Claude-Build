@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { resetPasswordAction, type ActionState } from "@/server/actions/auth";
+import { SpinnerLabel } from "@/components/ui/Spinner";
 
 const initial: ActionState = {};
 
@@ -64,7 +65,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             disabled={pending}
             className="w-full rounded-lg bg-ember px-5 py-3 font-heading text-[15px] font-semibold text-white hover:bg-ember-hover disabled:opacity-60"
           >
-            {pending ? "Updating…" : "Update password →"}
+            {pending ? <SpinnerLabel>Updating…</SpinnerLabel> : "Update password →"}
           </button>
         </form>
       )}
