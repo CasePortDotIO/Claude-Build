@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withDbRetry } from "@/lib/prisma";
 import { sendDueReminders, sweepNoShows } from "@/lib/agent/reminders";
 
 /**
@@ -19,7 +19,8 @@ async function runJob(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const orgs = await prisma.org.findMany({ where: { type: "CLIENT" }, select: { id: true } });
+  // withDbRetry: tolerate a cold Neon compute on the cron's first query.
+  const orgs = await withDbRetry(() => prisma.org.findMany({ where: { type: "CLIENT" }, select: { id: true } }));
   let reminded = 0;
   let noShows = 0;
   for (const org of orgs) {
