@@ -7,6 +7,9 @@ import { signIn } from "@/lib/auth";
 import { seedSampleData } from "@/lib/sample/seed";
 import { createAuthToken, consumeAuthToken } from "@/lib/auth/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email/auth-emails";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
+
+const MIN = 60_000;
 
 function slugify(name: string): string {
   return (
@@ -28,6 +31,9 @@ export interface ActionState {
  * The new org is a standalone CLIENT workspace (no parent agency in v1 sign-up).
  */
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const limit = await rateLimit(`signup:${await clientIp()}`, 5, 60 * MIN);
+  if (!limit.allowed) return { error: "Too many sign-up attempts. Please try again later." };
+
   const parsed = signUpSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -87,6 +93,9 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
  * exists and has a password (not an OAuth-only account).
  */
 export async function requestPasswordResetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const limit = await rateLimit(`pwreset:${await clientIp()}`, 5, 60 * MIN);
+  if (!limit.allowed) return { ok: true }; // silently throttle (don't reveal anything)
+
   const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
@@ -116,6 +125,9 @@ export async function resetPasswordAction(_prev: ActionState, formData: FormData
 }
 
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const limit = await rateLimit(`signin:${await clientIp()}`, 10, 10 * MIN);
+  if (!limit.allowed) return { error: "Too many attempts. Please wait a few minutes and try again." };
+
   const parsed = signInSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
