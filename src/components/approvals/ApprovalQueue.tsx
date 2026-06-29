@@ -195,6 +195,7 @@ export function ApprovalQueue({ drafts }: { drafts: DraftVM[] }) {
               <button
                 key={d.id}
                 onClick={() => setActiveId(d.id)}
+                aria-current={on || undefined}
                 className={`relative block w-full overflow-hidden border-b border-line-2 px-4 py-3 pl-5 text-left last:border-b-0 transition-colors ${
                   exitingId === d.id ? "animate-wsExit" : ""
                 } ${on ? "bg-cream" : "hover:bg-cream-head"}`}

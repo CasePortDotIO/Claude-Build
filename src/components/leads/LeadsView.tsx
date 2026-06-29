@@ -151,6 +151,7 @@ export function LeadsView({
               <button
                 key={l.id}
                 onClick={() => setSelectedId(l.id)}
+                aria-current={on || undefined}
                 className={`relative grid w-full grid-cols-[1.6fr_0.9fr_1fr] items-center gap-3 border-b border-line-2 px-[22px] py-3.5 pl-6 text-left last:border-b-0 transition-colors ${
                   on ? "bg-cream" : "hover:bg-cream-head"
                 }`}
