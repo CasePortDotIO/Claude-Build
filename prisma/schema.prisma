@@ -128,6 +128,13 @@ model Org {
   autopilotSend  Boolean @default(false) // auto-send drafts a human ALREADY approved (approval gate preserved)
   autopilotApprove Boolean @default(false) // auto-APPROVE + send high-confidence drafts (skips the queue; low-confidence still waits)
 
+  // Stripe billing (set by checkout + webhook). billingStatus above mirrors the
+  // Stripe subscription state for quick reads/gating.
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  currentPeriodEnd     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
