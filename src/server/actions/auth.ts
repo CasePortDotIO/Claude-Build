@@ -7,6 +7,7 @@ import { signIn } from "@/lib/auth";
 import { createAuthToken, consumeAuthToken } from "@/lib/auth/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email/auth-emails";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { isCompedEmail } from "@/lib/billing/comp";
 
 const MIN = 60_000;
 
@@ -55,9 +56,13 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
+  // Private-beta comp: invited testers (TRIAL_COMP_EMAILS) start on a free trial
+  // so they sail past the paid-only paywall; everyone else starts "incomplete".
+  const billingStatus = isCompedEmail(email) ? "trial" : undefined;
+
   const orgId = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({ data: { name, email, passwordHash } });
-    const org = await tx.org.create({ data: { name: orgName, slug, type: "CLIENT" } });
+    const org = await tx.org.create({ data: { name: orgName, slug, type: "CLIENT", ...(billingStatus ? { billingStatus } : {}) } });
     await tx.membership.create({ data: { userId: user.id, orgId: org.id, role: "CLIENT_ADMIN" } });
     await tx.auditLog.create({
       data: { orgId: org.id, actorId: user.id, action: "org.create", targetType: "Org", targetId: org.id },
