@@ -3,6 +3,7 @@ import { getCalendarProvider, calendarContext } from "@/lib/calendar";
 import { transition, canTransition } from "@/lib/agent/state-machine";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { notifyBooking } from "@/lib/notify";
+import { createNotification } from "@/lib/notifications";
 import { slotLabel } from "@/lib/calendar/slots";
 import { validateBookingSlot } from "@/lib/calendar/validate";
 import { sendBookingConfirmation } from "@/lib/agent/reminders";
@@ -145,6 +146,7 @@ export async function bookCall(opts: {
   // Notify the operator + send the attendee a confirmation (both best-effort).
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email;
   await notifyBooking({ orgId, leadName: name, whenLabel: slotLabel(startsAt), meetingUrl });
+  await createNotification({ orgId, kind: "CALL_BOOKED", title: `Call booked with ${name}`, body: slotLabel(startsAt), actionUrl: `/leads?id=${leadId}` });
   await sendBookingConfirmation(booking.id).catch(() => {});
   // §10: a booked call is the headline conversion.
   await recordOutcome({ orgId, leadId, kind: "BOOKED", valueCents: lead.dealValueCents });

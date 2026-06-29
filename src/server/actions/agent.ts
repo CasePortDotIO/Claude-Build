@@ -6,6 +6,7 @@ import { requireOrg } from "@/lib/auth-helpers";
 import { learnVoice } from "@/lib/agent/voice";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
 import { autoApproveAndSend } from "@/lib/agent/autosend";
+import { createNotification } from "@/lib/notifications";
 import {
   learnVoiceSchema,
   generateDraftsSchema,
@@ -111,6 +112,18 @@ export async function generateDraftsAction(raw: unknown): Promise<AgentActionRes
       console.error("auto-send after generate failed (drafts are queued):", e);
       autoMsg = " Drafts are queued; auto-send will retry shortly.";
     }
+  }
+
+  // Notify when there's something to review (skip when auto-send is on — those
+  // went out without needing the queue).
+  if (generated > 0 && !org?.autopilotApprove) {
+    await createNotification({
+      orgId: ctx.orgId,
+      kind: "DRAFT_READY",
+      title: generated === 1 ? "A draft is ready to review" : `${generated} drafts ready to review`,
+      body: "Open Approvals to review and send.",
+      actionUrl: "/approvals",
+    });
   }
 
   revalidatePath("/approvals");

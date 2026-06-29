@@ -8,6 +8,7 @@ import { ingestInboundEmail } from "@/lib/agent/inbound";
 import { reverifyStale } from "@/lib/agent/maintenance";
 import { simulatedLeadReply } from "@/lib/mailbox/simulation";
 import { getMailboxProvider, getReadyContext, hasGoogleOAuth } from "@/lib/mailbox";
+import { createNotification } from "@/lib/notifications";
 
 export interface MailboxActionResult {
   ok: boolean;
@@ -67,7 +68,10 @@ export async function sendDraftAction(draftId: string): Promise<MailboxActionRes
   try {
     await sendApprovedDraft({ orgId: ctx.orgId, draftId });
   } catch (e) {
-    if (e instanceof SendError) return { ok: false, error: e.message };
+    if (e instanceof SendError) {
+      await createNotification({ orgId: ctx.orgId, kind: "SEND_FAILED", title: "A send failed", body: e.message, actionUrl: "/approvals" });
+      return { ok: false, error: e.message };
+    }
     throw e;
   }
   revalidatePath("/conversations");
