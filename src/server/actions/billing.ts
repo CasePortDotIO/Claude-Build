@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireOrg, assertRole } from "@/lib/auth-helpers";
-import { isBillingConfigured, createCustomer, createCheckoutSession, createPortalSession } from "@/lib/billing/stripe";
+import { isBillingConfigured, createCustomer, createCheckoutSession, createPortalSession, subscriptionActive } from "@/lib/billing/stripe";
 
 export interface BillingActionResult {
   ok: boolean;
@@ -45,6 +45,13 @@ export async function startCheckoutAction(): Promise<BillingActionResult> {
     console.error("checkout failed:", err);
     return { ok: false, error: "Couldn't start checkout — try again." };
   }
+}
+
+/** Whether the active org currently has access (paid). Used by the billing wall to detect activation after checkout. */
+export async function subscriptionStatusAction(): Promise<{ active: boolean }> {
+  const ctx = await requireOrg();
+  const org = await prisma.org.findUnique({ where: { id: ctx.orgId }, select: { billingStatus: true } });
+  return { active: subscriptionActive(org?.billingStatus) };
 }
 
 /** Open the Stripe billing portal (manage/cancel/update card). Admin-only. */

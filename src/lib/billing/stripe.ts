@@ -9,6 +9,17 @@ import { getSecret } from "@/lib/config/secrets";
  */
 const API = "https://api.stripe.com/v1";
 
+/**
+ * Billing statuses that grant access to the app (paid-only launch). Anything
+ * else (incomplete / past_due / paused / canceled) is walled behind /billing
+ * when billing is configured.
+ */
+export const ACTIVE_BILLING_STATUSES = ["active", "trial"] as const;
+
+export function subscriptionActive(status: string | null | undefined): boolean {
+  return ACTIVE_BILLING_STATUSES.includes((status ?? "") as (typeof ACTIVE_BILLING_STATUSES)[number]);
+}
+
 export async function isBillingConfigured(): Promise<boolean> {
   return Boolean((await getSecret("STRIPE_SECRET_KEY")) && (await getSecret("STRIPE_PRICE_ID")));
 }
