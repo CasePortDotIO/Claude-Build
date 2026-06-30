@@ -1,0 +1,62 @@
+/* The Warm Sweep — shared design system.
+   Reference only: this exact block is already inlined (scoped to #ws) inside every
+   page .html so each file is standalone-pasteable into a Systeme Raw HTML element.
+   Tokens pulled from the Claude Design prototype. */
+
+#ws{
+  --cream:#FAF7F2; --paper:#FFFFFF; --ink:#1A1A1A; --ink2:#524e47; --muted:#857f74;
+  --line:#efe9df; --line2:#d8d3c8; --orange:#E8743B; --orange-d:#cf5f29;
+  --green:#1B7A57; --green-bg:#F3FAF6; --dark:#1A1A1A;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  color:var(--ink); background:var(--cream); line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-align:left;
+}
+#ws *{box-sizing:border-box; margin:0; padding:0;}
+#ws .sec{padding:clamp(48px,7vw,84px) 22px;}
+#ws .sec--paper{background:var(--paper); border-top:1px solid var(--line);}
+#ws .wrap{max-width:660px; margin:0 auto;}
+#ws .wrap--wide{max-width:920px;}
+#ws .kicker{font-family:'Poppins',sans-serif; font-weight:600; font-size:12px;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--orange); margin-bottom:14px;}
+#ws h1,#ws h2,#ws h3{font-family:'Poppins',sans-serif; line-height:1.18; color:var(--ink); font-weight:700;}
+#ws h1{font-size:clamp(28px,5vw,42px); letter-spacing:-.02em;}
+#ws h2{font-size:clamp(23px,3.6vw,32px); letter-spacing:-.01em;}
+#ws h3{font-size:clamp(17px,2.2vw,20px); font-weight:600;}
+#ws .lead{font-size:clamp(16px,2vw,19px); color:var(--ink2); margin-top:16px;}
+#ws p{font-size:16px; color:var(--ink2); margin-top:14px;}
+#ws .em{color:var(--orange); font-weight:600;}
+#ws .emg{color:var(--green); font-weight:600;}
+#ws .cta{display:inline-block; background:var(--orange); color:#fff !important; text-decoration:none;
+  font-family:'Poppins',sans-serif; font-weight:600; font-size:16px; padding:16px 30px;
+  border:none; border-radius:10px; cursor:pointer; transition:background .15s ease, transform .15s ease;
+  box-shadow:0 6px 18px rgba(232,116,59,.28);}
+#ws .cta:hover{background:var(--orange-d); transform:translateY(-1px);}
+#ws .cta--block{display:block; width:100%; text-align:center;}
+#ws .cta--ghost{background:#fff; color:var(--green) !important; border:1.5px solid var(--green); box-shadow:none;}
+#ws .cta--ghost:hover{background:var(--green-bg);}
+#ws .micro{font-size:13px; color:var(--muted); margin-top:12px;}
+#ws .card{background:#fff; border:1px solid var(--line); border-radius:16px; padding:clamp(22px,3vw,32px);}
+#ws .checks{list-style:none; margin-top:8px;}
+#ws .checks li{position:relative; padding-left:30px; margin-top:14px; font-size:16px; color:var(--ink2);}
+#ws .checks li::before{content:"✓"; position:absolute; left:0; top:0; color:var(--green); font-weight:700;}
+#ws .nos li{padding-left:30px;}
+#ws .nos li::before{content:"✗"; color:#c0584a;}
+#ws .step{display:flex; gap:18px; margin-top:26px;}
+#ws .step .n{flex:none; width:40px; height:40px; border-radius:50%; background:var(--green-bg);
+  color:var(--green); font-family:'Poppins',sans-serif; font-weight:700; display:flex; align-items:center; justify-content:center;}
+#ws .band{background:var(--dark); color:#fff; text-align:center; padding:clamp(44px,6vw,64px) 22px;}
+#ws .band h2{color:#fff;} #ws .band p{color:#cfc9bf;}
+#ws details{border-top:1px solid var(--line); }
+#ws details summary{list-style:none; cursor:pointer; padding:20px 0; font-family:'Poppins',sans-serif;
+  font-weight:600; font-size:16px; color:var(--ink); display:flex; justify-content:space-between; gap:16px; align-items:center;}
+#ws details summary::-webkit-details-marker{display:none;}
+#ws details summary::after{content:"⌄"; color:var(--green); font-size:20px; transition:transform .25s ease; flex:none;}
+#ws details[open] summary::after{transform:rotate(180deg);}
+#ws details .a{padding:0 0 20px; color:var(--ink2); font-size:15px;}
+#ws .price{font-family:'Poppins',sans-serif; font-weight:700; font-size:clamp(34px,6vw,48px); color:var(--ink);}
+#ws .strike{color:var(--muted); text-decoration:line-through; font-weight:500;}
+#ws .pill{display:inline-block; background:var(--green-bg); color:var(--green); font-weight:600;
+  font-size:13px; padding:6px 14px; border-radius:999px;}
+#ws .foot{text-align:center; font-size:13px; color:var(--muted); padding:28px 22px; border-top:1px solid var(--line);}
+#ws .drop{border:2px dashed var(--orange); background:#FFF8F2; border-radius:12px; padding:22px;
+  text-align:center; color:var(--orange-d); font-weight:600; font-family:'Poppins',sans-serif; margin-top:8px;}

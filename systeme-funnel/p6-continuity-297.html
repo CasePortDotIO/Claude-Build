@@ -1,0 +1,188 @@
+<!-- ============================================================
+  CONTINUITY — $297/MONTH "Always-On" (BUILD IN ITS OWN FUNNEL)
+  Systeme SALES page → native SUBSCRIPTION order form (recurring product "$297/mo").
+  Every "Start My Always-On Plan" = NATIVE button → that subscription order form. Replace [X].
+=============================================================== -->
+<div id="ws">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap');
+#ws{--cream:#FAF7F2;--paper:#FFFFFF;--ink:#1A1A1A;--ink2:#524e47;--muted:#857f74;--line:#efe9df;--orange:#E8743B;--orange-d:#cf5f29;--green:#1B7A57;--green-bg:#F3FAF6;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);background:var(--cream);line-height:1.6;}
+#ws *{box-sizing:border-box;margin:0;padding:0;}
+#ws .sec{padding:clamp(46px,6.5vw,80px) 22px;}
+#ws .sec--paper{background:var(--paper);border-top:1px solid var(--line);}
+#ws .wrap{max-width:680px;margin:0 auto;}
+#ws .tc{text-align:center;}
+#ws .kicker{font-family:'Poppins',sans-serif;font-weight:600;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);margin-bottom:14px;}
+#ws h1,#ws h2,#ws h3{font-family:'Poppins',sans-serif;line-height:1.18;color:var(--ink);font-weight:700;}
+#ws h1{font-size:clamp(27px,4.8vw,40px);letter-spacing:-.02em;}
+#ws h2{font-size:clamp(22px,3.5vw,30px);}#ws h3{font-size:17px;font-weight:600;}
+#ws .lead{font-size:clamp(16px,2vw,19px);color:var(--ink2);margin-top:16px;}
+#ws p{font-size:16px;color:var(--ink2);margin-top:13px;}
+#ws .em{color:var(--orange);font-weight:600;}#ws .emg{color:var(--green);font-weight:600;}
+#ws .checks{list-style:none;margin-top:10px;}
+#ws .checks li{position:relative;padding-left:28px;margin-top:12px;font-size:15px;color:var(--ink2);}
+#ws .checks li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700;}
+#ws .nos li::before{content:"—";color:#b9542f;}
+#ws .step{display:flex;gap:16px;margin-top:18px;}
+#ws .step .n{flex:none;width:34px;height:34px;border-radius:50%;background:var(--green-bg);color:var(--green);font-family:'Poppins',sans-serif;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;}
+#ws .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;}
+#ws .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px;}
+@media(max-width:640px){#ws .grid2{grid-template-columns:1fr;}}
+#ws .col{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;}
+#ws .col--win{border:2px solid var(--green);}
+#ws .col h3{font-size:16px;}#ws .col .big{font-family:'Poppins',sans-serif;font-weight:700;font-size:22px;margin-top:4px;}
+#ws .col ul{list-style:none;margin-top:12px;}#ws .col li{font-size:14px;color:var(--ink2);margin-top:9px;}
+#ws .dash{background:#11261d;color:#eafff5;border-radius:16px;padding:26px;margin-top:20px;}
+#ws .dash .stat{display:inline-block;margin:8px 24px 8px 0;}
+#ws .dash .stat b{font-family:'Poppins',sans-serif;font-size:26px;display:block;color:#fff;}
+#ws .dash .stat span{font-size:12px;color:#9fd6bd;}
+#ws .quote{background:#fff;border-left:3px solid var(--green);border-radius:0 12px 12px 0;padding:18px 20px;margin-top:16px;font-size:15px;color:var(--ink2);}
+#ws .quote cite{display:block;margin-top:10px;font-style:normal;font-size:13px;color:var(--muted);}
+#ws .price{font-family:'Poppins',sans-serif;font-weight:700;font-size:clamp(34px,6vw,48px);color:var(--ink);}
+#ws .guar{background:#11261d;color:#eafff5;border-radius:16px;padding:26px;text-align:center;}
+#ws .guar p{color:#bfe6d4;}#ws .guar h2{color:#fff;}
+#ws .band{background:#1A1A1A;color:#fff;text-align:center;padding:clamp(44px,6vw,64px) 22px;}
+#ws .band h2{color:#fff;}#ws .band p{color:#cfc9bf;}
+#ws .micro{font-size:13px;color:var(--muted);margin-top:12px;}
+#ws .foot{text-align:center;font-size:13px;color:var(--muted);padding:24px 22px;border-top:1px solid var(--line);}
+#ws .drop{display:inline-block;border:2px dashed var(--orange);background:#FFF8F2;border-radius:10px;padding:13px 18px;color:var(--orange-d);font-weight:600;font-family:'Poppins',sans-serif;font-size:13.5px;}
+#ws details{border-top:1px solid var(--line);}
+#ws summary{list-style:none;cursor:pointer;padding:18px 0;font-family:'Poppins',sans-serif;font-weight:600;font-size:16px;display:flex;justify-content:space-between;gap:16px;align-items:center;}
+#ws summary::-webkit-details-marker{display:none;}#ws summary::after{content:"⌄";color:var(--green);font-size:20px;transition:transform .25s;flex:none;}
+#ws details[open] summary::after{transform:rotate(180deg);}#ws details .a{padding:0 0 18px;color:var(--ink2);font-size:15px;}
+</style>
+
+<section class="sec tc">
+  <div class="wrap">
+    <div class="kicker">The Warm Sweep™ — Always-On Plan</div>
+    <h1>Your AI follow-up department. Running <span class="em">every hour of every day</span> — for less than one coaching session.</h1>
+    <p class="lead">While you're coaching, sleeping, or completely offline, The Warm Sweep™ keeps working the leads
+      everyone else gave up on — reopening conversations, booking the ready ones, and quietly recovering revenue you'd
+      already mourned. You wake up to a fuller calendar. <strong>$297/month. Cancel anytime.</strong></p>
+    <div style="margin-top:26px;"><span class="drop">⬇ Native button “Start My Always-On Plan →” → subscription order form ⬇</span></div>
+  </div>
+</section>
+
+<section class="sec sec--paper">
+  <div class="wrap">
+    <div class="kicker">The lead problem nobody talks about</div>
+    <h2>Getting leads is the problem everyone solves. <span class="em">Losing them</span> is the one that kills growth.</h2>
+    <p>A lead goes lukewarm in 48 hours without a follow-up. After two weeks, they've mentally moved on. After 60 days,
+      they've hired someone else or given up on coaching entirely. And most coaches never follow up at all — not because
+      they don't care, but because doing it manually feels desperate, time-consuming, and pointless when the list is
+      already cold. That's the gap. The Warm Sweep™ closes it permanently.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2 class="tc">How The Always-On Plan Works</h2>
+    <div class="step"><div class="n">1</div><div><p style="margin-top:0;">Your leads feed in automatically — new opt-ins, CRM imports, or manual uploads. Any lead that goes quiet enters the queue.</p></div></div>
+    <div class="step"><div class="n">2</div><div><p style="margin-top:0;">The AI identifies who's cold and sends personalized outreach — not templates. Tailored to what they originally inquired about, timed for maximum reply rate.</p></div></div>
+    <div class="step"><div class="n">3</div><div><p style="margin-top:0;">Interested leads book directly onto your calendar — you receive a notification. You show up. That's your entire role.</p></div></div>
+    <p class="tc micro" style="margin-top:22px;">You don't write messages. You don't chase. You don't manage anything. You open your calendar.</p>
+  </div>
+</section>
+
+<section class="sec sec--paper">
+  <div class="wrap">
+    <h2 class="tc">Everything Included At $297/Month</h2>
+    <ul class="checks" style="margin-top:20px;">
+      <li>Always-on AI reactivation agent — processes your leads 24/7, never takes a break</li>
+      <li>Unlimited contacts — no cap on list size, ever</li>
+      <li>Unlimited lists — import every list you have, past and present</li>
+      <li>Personalized outreach sequences — AI-tailored per lead, not generic templates</li>
+      <li>Auto-booking — interested leads schedule directly to your calendar</li>
+      <li>Recovered-revenue dashboard — real-time view of what's been generated</li>
+      <li>Speed-to-Lead mode — new cold leads get a follow-up within 5 minutes</li>
+      <li>Deliverability Vault — sender reputation protected, spam folder avoided</li>
+      <li>Monthly performance report — what was sent, who replied, what was booked, what was recovered</li>
+      <li>Priority support — real human, 24-hour response (not a chatbot)</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2 class="tc">Compare Your Options</h2>
+    <div class="grid2">
+      <div class="col"><h3>Human Appointment Setter</h3><div class="big">$3,000–$5,000/mo</div>
+        <ul><li>Works 9–5, weekends off</li><li>Gets sick, quits, needs training</li><li>Results depend on one person's energy</li><li>You manage them daily</li></ul></div>
+      <div class="col col--win"><h3 style="color:var(--green);">The Warm Sweep™ Always-On</h3><div class="big">$297/mo</div>
+        <ul><li>Runs 24/7/365</li><li>Never quits, never has a bad week</li><li>Improves as the AI learns your list</li><li>You do nothing</li></ul></div>
+    </div>
+    <p class="tc emg" style="font-family:'Poppins',sans-serif;font-weight:600;margin-top:18px;">Same outcome. 93% lower cost. Zero management.</p>
+
+    <div class="dash">
+      <div class="kicker" style="color:#79e0b4;">You see everything it does · The Warm Sweep™ Dashboard</div>
+      <div class="stat"><b>$11,400</b><span>Recovered revenue</span></div>
+      <div class="stat"><b>7</b><span>Calls booked</span></div>
+      <div class="stat"><b>23/140</b><span>Replies / sent</span></div>
+      <p class="micro" style="color:#9fd6bd;">Illustrative dashboard — your real numbers populate as the sweep runs.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--paper">
+  <div class="wrap">
+    <div class="guar">
+      <div class="kicker" style="color:#79e0b4;">The Always-On Guarantee</div>
+      <h2>Book at least [X] calls in 30 days — or we work your list free until you do.</h2>
+      <p>If it doesn't book at least <strong>[X]</strong> qualified calls in your first 30 days, we keep running your
+        reactivation campaigns at zero additional charge until it does. No time limit. Applies to accounts with 50+
+        contacts and a valid booking link.</p>
+    </div>
+    <div class="quote">“I had 140 leads I'd written off across 18 months. The Warm Sweep™ booked 7 calls in the first 3 weeks. Two became clients at $3,400 each. I made back 14 months of fees in one month.”<cite>— Jessica M., health coach</cite></div>
+    <div class="quote">“The dashboard shows me exactly what's been sent, who replied, and what was recovered. It's the only tool I'm 100% keeping.”<cite>— Daniel R., executive coach</cite></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2 class="tc">Is The Always-On Plan Right For You?</h2>
+    <div class="grid2">
+      <div class="col"><h3 style="color:var(--green);">For:</h3><ul class="checks" style="margin-top:10px;">
+        <li>Coaches actively taking on new clients right now</li><li>Anyone with an existing list of 50+ contacts</li>
+        <li>Coaches who want calls without more marketing spend</li><li>Coaches willing to let AI handle follow-up</li>
+        <li>Anyone who's already seen results from the founding package</li></ul></div>
+      <div class="col"><h3 style="color:#b9542f;">Not for:</h3><ul class="checks nos" style="margin-top:10px;">
+        <li>Coaches with no existing lead list</li><li>Coaches who want to approve every message</li>
+        <li>Anyone not currently taking clients</li><li>Anyone looking for a lead-generation tool</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--paper">
+  <div class="wrap" style="max-width:520px;">
+    <div class="card tc">
+      <div class="kicker">Get Started Today · The Warm Sweep™ — Always-On</div>
+      <div class="price">$297 <span style="font-size:17px;color:var(--muted);font-weight:500;">/ month</span></div>
+      <p class="micro">Cancel anytime · No setup fee · No contract</p>
+      <!-- ⬇⬇⬇ NATIVE SUBSCRIPTION ORDER FORM (recurring $297/mo) — or a button to it ⬇⬇⬇ -->
+      <div style="margin-top:20px;"><span class="drop">⬇ Native subscription order form / button → product “$297/mo” ⬇</span></div>
+      <p class="micro">After checkout, you'll complete a 5-minute onboarding form. Your first sweep begins within 48 hours.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2 class="tc" style="margin-bottom:16px;">Common Questions</h2>
+    <details><summary>What happens after I pay?</summary><div class="a">You fill out a 5-minute onboarding form about your list, your ideal client, and your booking link. Within 48 hours, your Always-On agent is live. No calls required.</div></details>
+    <details><summary>What if my list is years old?</summary><div class="a">Perfect. The older the list, the more found money is typically in it. Cold leads from 12–24 months ago are exactly who this was designed for.</div></details>
+    <details><summary>Do you write the messages?</summary><div class="a">Yes. The AI writes and sends every message, personalized to each lead. You never touch the outreach unless you want to.</div></details>
+    <details><summary>Can I cancel?</summary><div class="a">Anytime, from your account dashboard. Cancels at the end of the billing period. No penalties, no questions.</div></details>
+    <details><summary>What exactly does the guarantee cover?</summary><div class="a">At least [X] booked calls in your first 30 days. If we miss it, we keep running your list free until we hit it.</div></details>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Your next client is already in your list. They're just waiting for the <span class="em">right follow-up</span>.</h2>
+    <p>Every day you wait, that follow-up goes to a competitor instead. Switch it on once and never think about lead follow-up again.</p>
+    <div style="margin-top:24px;"><span class="drop">⬇ Native button “Start My Always-On Plan →” → subscription order form ⬇</span></div>
+  </div>
+</section>
+
+<div class="foot">Coach. Don't Chase. · A product of Delegate and Done LLC · Privacy · Terms</div>
+</div>

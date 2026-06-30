@@ -1,0 +1,79 @@
+<!-- ============================================================
+  STEP 7 — BUYER ONBOARDING (thank-you / delivery)
+  On a Systeme THANK-YOU page. "Complete My Intake Form" = NATIVE button → your intake form
+  (a Systeme form/page that tags onboarding-complete and hands the list to the agent).
+=============================================================== -->
+<div id="ws">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap');
+#ws{--cream:#FAF7F2;--paper:#FFFFFF;--ink:#1A1A1A;--ink2:#524e47;--muted:#857f74;--line:#efe9df;--orange:#E8743B;--orange-d:#cf5f29;--green:#1B7A57;--green-bg:#F3FAF6;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink);background:var(--cream);line-height:1.6;}
+#ws *{box-sizing:border-box;margin:0;padding:0;}
+#ws .sec{padding:clamp(42px,6vw,72px) 22px;}
+#ws .wrap{max-width:660px;margin:0 auto;}
+#ws .tc{text-align:center;}
+#ws .badge{background:var(--green-bg);color:var(--green);text-align:center;font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;padding:14px 22px;}
+#ws .kicker{font-family:'Poppins',sans-serif;font-weight:600;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);margin-bottom:12px;}
+#ws h1{font-family:'Poppins',sans-serif;font-size:clamp(26px,4.4vw,38px);font-weight:700;letter-spacing:-.02em;line-height:1.18;}
+#ws h2,#ws h3{font-family:'Poppins',sans-serif;font-weight:700;line-height:1.2;}
+#ws h2{font-size:clamp(20px,3vw,26px);}#ws h3{font-size:17px;font-weight:600;}
+#ws .lead{font-size:clamp(16px,2vw,19px);color:var(--ink2);margin-top:16px;}
+#ws p{font-size:16px;color:var(--ink2);margin-top:13px;}
+#ws .em{color:var(--orange);font-weight:600;}
+#ws .step{display:flex;gap:18px;margin-top:24px;}
+#ws .step .n{flex:none;width:40px;height:40px;border-radius:50%;background:var(--green-bg);color:var(--green);font-family:'Poppins',sans-serif;font-weight:700;display:flex;align-items:center;justify-content:center;}
+#ws .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;margin-top:26px;}
+#ws .checks{list-style:none;margin-top:10px;}
+#ws .checks li{position:relative;padding-left:28px;margin-top:12px;font-size:15px;color:var(--ink2);}
+#ws .checks li::before{content:"›";position:absolute;left:4px;color:var(--green);font-weight:700;}
+#ws .guar{background:#11261d;color:#eafff5;border-radius:14px;padding:22px;margin-top:26px;text-align:center;}
+#ws .guar p{color:#bfe6d4;}
+#ws .micro{font-size:13px;color:var(--muted);margin-top:12px;}
+#ws .drop{border:2px dashed var(--orange);background:#FFF8F2;border-radius:10px;padding:16px;text-align:center;color:var(--orange-d);font-weight:600;font-family:'Poppins',sans-serif;font-size:14px;margin-top:18px;}
+#ws .foot{text-align:center;font-size:13px;color:var(--muted);padding:24px 22px;border-top:1px solid var(--line);}
+</style>
+
+<div class="badge">✓ You're in. Your Warm Sweep™ is being set up.</div>
+
+<section class="sec tc">
+  <div class="wrap">
+    <div class="kicker">Welcome To Coach. Don't Chase.</div>
+    <h1>Your dead leads are about to get a message they'll <span class="em">actually reply to</span>.</h1>
+    <p class="lead">Here's exactly what happens next — and the one 5-minute step that stands between you and your
+      first booked call. Do it now, while you're here. The leads don't get warmer while you wait.</p>
+  </div>
+</section>
+
+<section class="sec" style="padding-top:0;">
+  <div class="wrap">
+    <h2 class="tc">What Happens Now</h2>
+    <div class="step"><div class="n">1</div><div><h3>Complete your intake form (5 minutes)</h3><p style="margin-top:6px;">This is how we personalize your reactivation campaign — tell us about your list, your ideal client, and your booking link. Do it now, while it's in front of you: every day it sits in your inbox is a day your leads keep cooling. No intake, no sweep.</p>
+      <!-- ⬇ NATIVE button → your intake form ⬇ -->
+      <div class="drop">⬇ Native button “Complete My Intake Form →” → your Systeme intake form (tag <code>onboarding-complete</code>) ⬇</div>
+    </div></div>
+    <div class="step"><div class="n">2</div><div><h3>We build your campaign (within 48 hours)</h3><p style="margin-top:6px;">Your AI agent is configured to your list and your ideal client. You'll receive a confirmation email when it's live.</p></div></div>
+    <div class="step"><div class="n">3</div><div><h3>Your first outreach goes out (within 72 hours)</h3><p style="margin-top:6px;">The AI begins working your list. You'll see the first activity in your dashboard within 5–7 days.</p></div></div>
+
+    <div class="card">
+      <h3>What You'll Need For The Intake Form</h3>
+      <p class="micro" style="margin-top:4px;">Have these ready — the form takes 5 minutes with them, 20 without:</p>
+      <ul class="checks">
+        <li>Your lead list (CSV, Google Sheet, or CRM export — minimum 50 contacts)</li>
+        <li>Your booking link (Cal.com, Calendly, or any scheduling link)</li>
+        <li>A 1–2 sentence description of who you coach and what outcome you deliver</li>
+        <li>The email address you want the AI outreach to send from</li>
+      </ul>
+      <p class="micro">Formats accepted: CSV, XLSX, Google Sheet link. CRM (HubSpot, GHL, etc.) → export contacts as CSV and upload that.</p>
+    </div>
+
+    <div class="guar">
+      <h3 style="color:#fff;">Your Guarantee</h3>
+      <p>If we don't book at least <strong>[X]</strong> calls in your first 30 days, we keep working your list free
+        until we do. You have nothing to lose except a list you'd already given up on.</p>
+    </div>
+
+    <p class="tc micro" style="margin-top:24px;"><strong>Support:</strong> Reply to your confirmation email. A real human reads every message and responds within 24 hours. No chatbot. No ticket queue.</p>
+  </div>
+</section>
+
+<div class="foot">Coach. Don't Chase. · Delegate and Done LLC · Privacy · Terms</div>
+</div>
