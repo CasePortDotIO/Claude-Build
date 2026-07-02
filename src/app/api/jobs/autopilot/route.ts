@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { runAutopilotForOrg } from "@/lib/agent/autopilot";
+import { collectDraftBatches } from "@/lib/agent/draft-batch";
 
 /**
  * M17 autopilot — the always-on job. Runs every few hours so fresh leads get
@@ -30,17 +31,31 @@ async function runJob(req: NextRequest) {
     }),
   );
 
+  // Phase 1: collect drafts from Message Batches submitted on a prior pass
+  // (50% token discount). Runs before the org loop so freshly landed drafts are
+  // eligible for this pass's auto-approve/send. Best-effort — a collection
+  // hiccup never blocks the run; unfinished batches are retried next pass.
+  let collected = 0;
+  try {
+    const c = await collectDraftBatches();
+    collected = c.drafted;
+  } catch (e) {
+    console.error("[autopilot] batch collection failed (will retry next pass):", e instanceof Error ? e.message : e);
+  }
+
   let synced = 0;
   let drafted = 0;
+  let batched = 0;
   let sent = 0;
   for (const org of orgs) {
     const r = await runAutopilotForOrg(org.id);
     synced += r.synced;
     drafted += r.drafted;
+    batched += r.batched;
     sent += r.sent;
   }
 
-  return NextResponse.json({ ok: true, orgs: orgs.length, synced, drafted, sent });
+  return NextResponse.json({ ok: true, orgs: orgs.length, synced, drafted, batched, collected, sent });
 }
 
 export const GET = runJob;

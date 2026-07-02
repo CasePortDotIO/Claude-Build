@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { pullFromSource } from "@/lib/leadsource";
 import { ingestLeads } from "@/lib/import/ingest";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
+import { pendingBatchLeadIds, submitAutopilotDraftBatch } from "@/lib/agent/draft-batch";
+import { hasAnthropic } from "@/lib/ai/config";
 import { runFollowupsForOrg } from "@/lib/agent/followup";
 import { sendAllApproved } from "@/lib/agent/send";
 import { autoApproveAndSend } from "@/lib/agent/autosend";
@@ -28,7 +30,8 @@ export const AUTO_DRAFT_BATCH = 25;
 export interface AutopilotRunResult {
   orgId: string;
   synced: number; // fresh leads ingested from connected sources
-  drafted: number; // fresh leads auto-drafted (queued for approval)
+  drafted: number; // fresh leads auto-drafted inline (queued for approval)
+  batched: number; // fresh leads submitted to a discounted Message Batch (drafts land next pass)
   skippedDrafts: number; // leads a draft guard refused (opted-out, suppressed, terminal)
   followedUp: number; // follow-up drafts queued for leads that went quiet
   closedOut: number; // leads closed after exhausting their follow-up touches
@@ -37,7 +40,7 @@ export interface AutopilotRunResult {
 }
 
 export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunResult> {
-  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, skippedDrafts: 0, followedUp: 0, closedOut: 0, autoApproved: 0, sent: 0 };
+  const result: AutopilotRunResult = { orgId, synced: 0, drafted: 0, batched: 0, skippedDrafts: 0, followedUp: 0, closedOut: 0, autoApproved: 0, sent: 0 };
 
   const org = await prisma.org.findUnique({
     where: { id: orgId },
@@ -81,14 +84,29 @@ export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunRes
   // land in PENDING_APPROVAL; nothing is sent here. The contactability gate
   // inside generateDraftsForLead refuses opted-out / suppressed / terminal leads.
   if (org.autopilotDraft) {
+    // Skip leads already in-flight in a submitted batch so nothing double-drafts.
+    const inFlight = await pendingBatchLeadIds(orgId);
     const fresh = await prisma.lead.findMany({
-      where: { orgId, status: "NEW" },
+      where: { orgId, status: "NEW", ...(inFlight.length ? { id: { notIn: inFlight } } : {}) },
       orderBy: { createdAt: "asc" },
       take: AUTO_DRAFT_BATCH,
       select: { id: true },
     });
     const operatorName = org.brandName || org.name || "the team";
-    for (const lead of fresh) {
+
+    // When Claude is keyed, submit the whole tranche as a Message Batch (50%
+    // discount; drafts land on the next cron pass). Stub mode (no key) and any
+    // batch-submit failure fall back to inline drafting so autopilot never stalls.
+    let inline = fresh;
+    if (fresh.length > 0 && (await hasAnthropic())) {
+      try {
+        result.batched = await submitAutopilotDraftBatch(orgId, fresh.map((f) => f.id), operatorName);
+        inline = [];
+      } catch (e) {
+        console.error(`[autopilot] batch submit failed for org ${orgId}; drafting inline:`, e instanceof Error ? e.message : e);
+      }
+    }
+    for (const lead of inline) {
       try {
         await generateDraftsForLead({ orgId, leadId: lead.id, operatorName, bulk: true });
         result.drafted += 1;
