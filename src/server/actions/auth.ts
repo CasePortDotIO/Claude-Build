@@ -8,6 +8,7 @@ import { createAuthToken, consumeAuthToken } from "@/lib/auth/tokens";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email/auth-emails";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { isCompedEmail } from "@/lib/billing/comp";
+import { isDisposableEmail } from "@/lib/auth/email-guard";
 
 const MIN = 60_000;
 
@@ -34,6 +35,12 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
   const limit = await rateLimit(`signup:${await clientIp()}`, 5, 60 * MIN);
   if (!limit.allowed) return { error: "Too many sign-up attempts. Please try again later." };
 
+  // Honeypot: a field hidden from humans but filled by naive bots. If it has any
+  // value, treat as a bot and stop — with a generic message, no hint it's a trap.
+  if ((formData.get("company_website") as string)?.trim()) {
+    return { error: "Something went wrong. Please try again." };
+  }
+
   const parsed = signUpSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -44,6 +51,12 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const { name, email, password, orgName } = parsed.data;
+
+  // Block throwaway/disposable inboxes — the fastest route to spam complaints
+  // that could get the shared mailbox OAuth app suspended for everyone.
+  if (isDisposableEmail(email)) {
+    return { error: "Please sign up with a permanent work email — disposable inboxes aren't supported." };
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { error: "An account with that email already exists." };
