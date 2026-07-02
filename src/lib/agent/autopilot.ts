@@ -90,7 +90,7 @@ export async function runAutopilotForOrg(orgId: string): Promise<AutopilotRunRes
     const operatorName = org.brandName || org.name || "the team";
     for (const lead of fresh) {
       try {
-        await generateDraftsForLead({ orgId, leadId: lead.id, operatorName });
+        await generateDraftsForLead({ orgId, leadId: lead.id, operatorName, bulk: true });
         result.drafted += 1;
       } catch (e) {
         if (e instanceof DraftGuardError) result.skippedDrafts += 1;

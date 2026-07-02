@@ -52,7 +52,10 @@ class AnthropicProvider implements LLMProvider {
   readonly model = "claude-opus-4-8";
 
   async draftReengagement(input: DraftInput): Promise<DraftResult> {
-    const model = (await getAiConfig()).anthropic.model;
+    const cfg = (await getAiConfig()).anthropic;
+    // Bulk (cron/autopilot) drafting rides the fast model — same prompts, same
+    // guardrails, a fraction of the cost. Interactive stays on the primary.
+    const model = input.tier === "bulk" ? cfg.fastModel : cfg.model;
     const { input: out, usage } = await callToolUse<RawDraftToolInput>({
       model,
       system: buildDraftSystemPrompt(input),

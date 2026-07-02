@@ -31,7 +31,6 @@ export default async function ApprovalsPage() {
     include: {
       lead: { select: { firstName: true, lastName: true, email: true, statedGoal: true } },
       variants: { orderBy: { index: "asc" } },
-      agentRun: { select: { provider: true, model: true } },
     },
   });
 
@@ -41,8 +40,6 @@ export default async function ApprovalsPage() {
     leadEmail: d.lead.email,
     leadGoal: d.lead.statedGoal,
     selectedVariantId: d.selectedVariantId,
-    provider: d.agentRun?.provider ?? "stub",
-    model: d.agentRun?.model ?? "—",
     variants: d.variants.map((v) => ({
       id: v.id,
       index: v.index,

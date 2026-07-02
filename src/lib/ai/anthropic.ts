@@ -36,7 +36,11 @@ export async function callToolUse<T>(opts: {
     body: JSON.stringify({
       model: opts.model,
       max_tokens: opts.maxTokens ?? 1500,
-      system: opts.system,
+      // Prompt caching: the system prompt (voice profile + doctrine) and tool
+      // schema are identical across every lead in a run, so marking the prefix
+      // cacheable bills it at ~10% after the first call. Ignored harmlessly if
+      // the prefix is under the model's cacheable minimum.
+      system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
       tools: [opts.tool],
       tool_choice: { type: "tool", name: opts.tool.name },
       messages: [{ role: "user", content: opts.userContent }],

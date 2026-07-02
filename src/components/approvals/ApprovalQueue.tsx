@@ -24,8 +24,6 @@ export interface DraftVM {
   leadEmail: string;
   leadGoal: string | null;
   selectedVariantId: string | null;
-  provider: string;
-  model: string;
   variants: VariantVM[];
 }
 

@@ -89,6 +89,7 @@ export async function runFollowupsForOrg(orgId: string, now: Date = new Date()):
           leadId: lead.id,
           operatorName,
           followUp: { touch, isFinal: touch >= MAX_TOUCHES, previousSubject: outbound[0].subject ?? null },
+          bulk: true,
         }),
       );
       result.generated += 1;

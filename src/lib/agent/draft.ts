@@ -54,9 +54,11 @@ export async function generateDraftsForLead(opts: {
   operatorName: string;
   variantCount?: number;
   followUp?: { touch: number; isFinal: boolean; previousSubject?: string | null };
+  // Cron/autopilot volume work — routes drafting to the fast model tier.
+  bulk?: boolean;
 }) {
   const start = Date.now();
-  const { orgId, leadId, operatorName, variantCount = 3, followUp } = opts;
+  const { orgId, leadId, operatorName, variantCount = 3, followUp, bulk } = opts;
 
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
   if (!lead) throw new DraftGuardError("Lead not found in this workspace.");
@@ -121,6 +123,7 @@ export async function generateDraftsForLead(opts: {
     voiceSamples: voiceSamples.map((m) => m.content),
     similarObjections: similarObjections.map((m) => m.content),
     variantCount,
+    tier: bulk ? "bulk" : "interactive",
     cohort,
     retiredPhrases: learning?.retiredPhrases ?? [],
     promotedOpeners: learning?.promotedOpeners ?? [],
@@ -159,7 +162,7 @@ export async function generateDraftsForLead(opts: {
         step: "DRAFT",
         provider: result.provider,
         model: result.model,
-        inputSummary: summarizeInput(lead, voiceSamples.length, similarObjections.length),
+        inputSummary: summarizeInput(lead),
         decision: { overallRationale: result.overallRationale, variantCount: result.variants.length } as object,
         rationale: result.overallRationale,
         confidence: result.variants[0]?.confidence ?? null,
@@ -214,12 +217,10 @@ export async function generateDraftsForLead(opts: {
   return draft;
 }
 
-function summarizeInput(lead: Lead, voiceCount: number, objCount: number): string {
-  const bits = [
-    `lead=${lead.firstName ?? lead.email}`,
-    lead.statedGoal ? `goal="${lead.statedGoal.slice(0, 60)}"` : "goal=none",
-    `voiceSamples=${voiceCount}`,
-    `objections=${objCount}`,
-  ];
-  return bits.join(" ");
+// Human sentence for the operator-facing activity log — never debug key=value
+// dumps. Internals (tokens, model, retrieval counts) stay in the run row's
+// structured fields, not in copy a customer reads.
+function summarizeInput(lead: Lead): string {
+  const who = lead.firstName ?? lead.email;
+  return lead.statedGoal ? `For ${who} — they wanted "${lead.statedGoal.slice(0, 80)}"` : `For ${who}`;
 }

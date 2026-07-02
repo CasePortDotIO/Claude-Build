@@ -31,6 +31,9 @@ export interface DraftInput {
   voiceSamples: string[]; // retrieved exemplars of the operator's voice
   similarObjections: string[]; // retrieved similar past objections
   variantCount: number; // 2–3
+  // Cost tier: "bulk" (cron/autopilot volume work) routes to the fast model;
+  // "interactive" (operator-clicked) uses the primary model. Default interactive.
+  tier?: "interactive" | "bulk";
   // M6 self-improvement: HOLDOUT leads get baseline copy (control); the agent's
   // learned phrasing is reserved for TREATMENT so lift is measurable.
   cohort?: "TREATMENT" | "HOLDOUT";

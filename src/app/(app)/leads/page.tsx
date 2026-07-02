@@ -50,7 +50,6 @@ export default async function LeadsPage({
         orderBy: { createdAt: "desc" },
         include: {
           variants: { orderBy: { index: "asc" } },
-          agentRun: { select: { provider: true } },
         },
       })
     : [];
@@ -66,7 +65,6 @@ export default async function LeadsPage({
       confidence: v.confidence,
       subject: d.finalSubject ?? v.subject,
       body: d.finalBody ?? v.body,
-      provider: d.agentRun?.provider ?? "stub",
     };
   }
 

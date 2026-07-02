@@ -22,12 +22,13 @@ export default async function AgentPage() {
   const ctx = await requireOrg();
   const db = orgScoped(ctx.orgId);
 
-  const [profile, sampleCount, memCount, draftCount, runs, insights, learning, cohorts] = await Promise.all([
+  const [profile, sampleCount, memCount, draftCount, runs, runCount, insights, learning, cohorts] = await Promise.all([
     db.voiceProfile.find(),
     db.voiceSample.count(),
     db.memory.count(),
     db.draft.count(),
     db.agentRun.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
+    prisma.agentRun.count({ where: { orgId: ctx.orgId } }),
     prisma.insight.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "desc" }, take: 20 }),
     prisma.orgLearning.findUnique({ where: { orgId: ctx.orgId } }),
     cohortStats(ctx.orgId),
@@ -71,8 +72,6 @@ export default async function AgentPage() {
     source: profile?.source ?? "default",
   };
 
-  const totalCost = runs.reduce((s, r) => s + r.costUsd, 0);
-
   return (
     <>
       <Topbar title="The Agent" subtitle="Your voice and what it's learning" />
@@ -103,10 +102,10 @@ export default async function AgentPage() {
 
         {/* memory stats */}
         <div className="mb-[18px] grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat value={voice.sampleCount} label="voice samples" />
-          <Stat value={memCount} label="memory embeddings" />
-          <Stat value={draftCount} label="drafts generated" green />
-          <Stat value={`$${totalCost.toFixed(4)}`} label="agent spend (logged)" />
+          <Stat value={voice.sampleCount} label="voice samples learned" />
+          <Stat value={memCount} label="things it remembers" />
+          <Stat value={draftCount} label="drafts written" green />
+          <Stat value={runCount} label="actions taken" />
         </div>
 
         {/* voice profile */}
@@ -128,15 +127,17 @@ export default async function AgentPage() {
           />
         </div>
 
-        {/* what it did (agent runs / raw audit log) */}
+        {/* what it did — human activity feed. Internals (model, tokens, cost,
+            latency) stay in the DB for our diagnostics; the operator sees only
+            what the agent did for them, in plain language. */}
         <div className="rounded-xl2 border border-line bg-white p-7">
           <p className="m-0 mb-5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">
-            What it did · agent run log
+            What it&apos;s been doing
           </p>
           {runs.length === 0 ? (
             <p className="m-0 text-[14px] text-muted">
-              No runs yet. Learn your voice and generate drafts to see the agent&apos;s decisions — every step is
-              logged here with tokens and cost for full auditability.
+              Nothing yet. Teach it your voice and generate your first drafts — everything the agent does for you
+              shows up here.
             </p>
           ) : (
             <div className="flex flex-col">
@@ -150,13 +151,7 @@ export default async function AgentPage() {
                       </p>
                       <span className="flex-none text-[12px] text-muted-3">{timeAgo(r.createdAt)}</span>
                     </div>
-                    <p className="m-0 mt-0.5 text-[13px] text-muted">{r.inputSummary}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-2">
-                      <Tag>{r.provider} · {r.model}</Tag>
-                      <Tag>{r.promptTokens + r.completionTokens} tokens</Tag>
-                      {r.costUsd > 0 && <Tag>${r.costUsd.toFixed(4)}</Tag>}
-                      <Tag>{r.latencyMs}ms</Tag>
-                    </div>
+                    <p className="m-0 mt-0.5 text-[13px] text-muted">{humanizeRunSummary(r.inputSummary)}</p>
                   </div>
                 </div>
               ))}
@@ -168,16 +163,24 @@ export default async function AgentPage() {
   );
 }
 
+/**
+ * Rows written before the human-summary change stored debug strings like
+ * `lead=Dana goal="ship the course" voiceSamples=0 objections=0`. Translate
+ * those legacy rows into the same plain language new rows use.
+ */
+function humanizeRunSummary(summary: string | null): string {
+  if (!summary) return "";
+  const legacy = summary.match(/^lead=(.+?) (?:goal="(.*)"|goal=none) voiceSamples=\d+ objections=\d+$/);
+  if (!legacy) return summary;
+  const [, who, goal] = legacy;
+  return goal ? `For ${who} — they wanted "${goal}"` : `For ${who}`;
+}
+
 function Stat({ value, label, green }: { value: number | string; label: string; green?: boolean }) {
   return (
     <div className="rounded-xl border border-line bg-cream px-4 py-4">
       <p className={`m-0 font-heading text-[23px] font-semibold tabular-nums ${green ? "text-sweep" : "text-ink"}`}>{value}</p>
       <p className="m-0 mt-1 text-[12px] text-muted">{label}</p>
     </div>
-  );
-}
-function Tag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-md bg-cream-head px-2 py-1 font-mono text-[11px] text-muted-2">{children}</span>
   );
 }

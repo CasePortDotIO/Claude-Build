@@ -67,7 +67,7 @@ const PROVIDERS: Provider[] = [
     help: "Anthropic Console → API Keys for Claude. Voyage AI dashboard for embeddings (optional). Model names are optional — sensible defaults are used.",
     fields: [
       { key: "ANTHROPIC_API_KEY", label: "Anthropic API key", placeholder: "sk-ant-…", secret: true },
-      { key: "ANTHROPIC_MODEL", label: "Model (optional)", placeholder: "claude-opus-4-8" },
+      { key: "ANTHROPIC_MODEL", label: "Model (optional)", placeholder: "claude-sonnet-5" },
       { key: "ANTHROPIC_MODEL_FAST", label: "Fast model (optional)", placeholder: "claude-haiku-4-5-20251001" },
       { key: "VOYAGE_API_KEY", label: "Voyage API key (optional)", placeholder: "pa-…", secret: true },
       { key: "VOYAGE_MODEL", label: "Voyage model (optional)", placeholder: "voyage-3" },
