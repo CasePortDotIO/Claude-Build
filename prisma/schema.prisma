@@ -123,6 +123,9 @@ model Org {
   // C5: in-app notification center (org-scoped activity alerts).
   notifications Notification[]
 
+  // Batched autopilot drafting (Anthropic Message Batches — 50% token discount).
+  draftBatches DraftBatch[]
+
   // M17 autopilot (always-on): opt-in per workspace, default OFF so existing
   // behavior is unchanged and nobody is surprised by auto-spend or auto-sends.
   // The nightly autopilot job acts only on orgs that turned a capability on.
@@ -1000,6 +1003,25 @@ enum NotificationKind {
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+// ── Batched autopilot drafting ────────────────────────────────────────────────
+// Tracks an Anthropic Message Batch submitted by the autopilot cron: one row per
+// submission, holding the lead ids in flight. The next cron pass collects ended
+// batches and persists drafts through the same rails as interactive drafting.
+model DraftBatch {
+  id              String   @id @default(cuid())
+  orgId           String
+  org             Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  providerBatchId String   @unique
+  status          String   @default("SUBMITTED") // SUBMITTED | DONE | FAILED
+  leadIds         String[]
+  operatorName    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([orgId])
 }
 
 model Notification {

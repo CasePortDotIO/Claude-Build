@@ -21,7 +21,7 @@ import type {
 } from "@/lib/ai/types";
 
 // ── Real provider: Claude via the Messages API with forced tool use ─────────
-interface RawDraftToolInput {
+export interface RawDraftToolInput {
   overall_rationale: string;
   variants: {
     angle: string;
@@ -31,6 +31,32 @@ interface RawDraftToolInput {
     confidence: number;
     rationale: string;
   }[];
+}
+
+/**
+ * Map the model's raw tool output into a DraftResult. Shared by the realtime
+ * provider and the batched autopilot collector so the two paths can't drift.
+ */
+export function rawDraftToResult(
+  raw: RawDraftToolInput,
+  usage: { promptTokens: number; completionTokens: number },
+  provider: string,
+  model: string,
+): DraftResult {
+  return {
+    variants: raw.variants.map((v) => ({
+      angle: v.angle,
+      subject: v.subject,
+      body: v.body,
+      openingLine: v.opening_line,
+      confidence: clamp01(v.confidence),
+      rationale: v.rationale,
+    })),
+    overallRationale: raw.overall_rationale,
+    usage,
+    provider,
+    model,
+  };
 }
 
 interface RawVoiceToolInput {
@@ -63,20 +89,7 @@ class AnthropicProvider implements LLMProvider {
       tool: draftToolSchema(input.variantCount),
       maxTokens: 2000,
     });
-    return {
-      variants: out.variants.map((v) => ({
-        angle: v.angle,
-        subject: v.subject,
-        body: v.body,
-        openingLine: v.opening_line,
-        confidence: clamp01(v.confidence),
-        rationale: v.rationale,
-      })),
-      overallRationale: out.overall_rationale,
-      usage,
-      provider: this.name,
-      model,
-    };
+    return rawDraftToResult(out, usage, this.name, model);
   }
 
   async draftReply(input: ReplyDraftInput): Promise<DraftResult> {
@@ -88,20 +101,7 @@ class AnthropicProvider implements LLMProvider {
       tool: draftToolSchema(input.variantCount),
       maxTokens: 1500,
     });
-    return {
-      variants: out.variants.map((v) => ({
-        angle: v.angle,
-        subject: v.subject,
-        body: v.body,
-        openingLine: v.opening_line,
-        confidence: clamp01(v.confidence),
-        rationale: v.rationale,
-      })),
-      overallRationale: out.overall_rationale,
-      usage,
-      provider: this.name,
-      model,
-    };
+    return rawDraftToResult(out, usage, this.name, model);
   }
 
   async learnVoice(input: VoiceLearnInput): Promise<VoiceLearnResult> {

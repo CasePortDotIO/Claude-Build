@@ -6,7 +6,7 @@ import { defaultVoiceProfile } from "@/lib/agent/voice";
 import { computeVoiceFidelity } from "@/lib/agent/voice-match";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { assignCohort } from "@/lib/agent/rollups";
-import type { DraftInput, VoiceProfileShape } from "@/lib/ai/types";
+import type { DraftInput, DraftResult, VoiceProfileShape } from "@/lib/ai/types";
 import type { Lead } from "@prisma/client";
 
 export class DraftGuardError extends Error {
@@ -39,16 +39,7 @@ async function safeRetrieve(
   }
 }
 
-/**
- * Generate re-engagement drafts for one lead and queue them for approval.
- *
- * Hard rails enforced here, never bypassable:
- *  - refuse if the lead is opted-out / do-not-contact / bounced / already booked,
- *  - refuse if the lead's email is on the org suppression list.
- * On success: supersede any prior pending draft, persist Draft + variants, log an
- * AgentRun, and move the lead to AWAITING_APPROVAL. No email is sent (that's M3).
- */
-export async function generateDraftsForLead(opts: {
+export interface DraftContextOpts {
   orgId: string;
   leadId: string;
   operatorName: string;
@@ -56,8 +47,15 @@ export async function generateDraftsForLead(opts: {
   followUp?: { touch: number; isFinal: boolean; previousSubject?: string | null };
   // Cron/autopilot volume work — routes drafting to the fast model tier.
   bulk?: boolean;
-}) {
-  const start = Date.now();
+}
+
+/**
+ * Gather everything one draft needs — lead, voice profile, retrieved memory,
+ * cohort — and enforce the hard rails (contactability + suppression), which are
+ * never bypassable. Shared by realtime drafting and the batched autopilot path
+ * so both run the exact same guards and prompt inputs.
+ */
+export async function buildDraftContext(opts: DraftContextOpts): Promise<{ lead: Lead; input: DraftInput }> {
   const { orgId, leadId, operatorName, variantCount = 3, followUp, bulk } = opts;
 
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
@@ -130,27 +128,30 @@ export async function generateDraftsForLead(opts: {
     followUp,
   };
 
-  // Reason: call the provider (Claude or stub). If a keyed provider fails at
-  // request time (bad/expired key, quota, upstream outage), fall back to the
-  // deterministic stub so the operator still gets a sendable, grounded draft
-  // instead of a dead button. The failure is logged for diagnosis.
-  const provider = await getLLMProvider();
-  let result;
-  try {
-    result = await provider.draftReengagement(input);
-  } catch (e) {
-    console.error(
-      `[draft] provider "${provider.name}" failed for lead ${leadId}; falling back to stub:`,
-      e instanceof Error ? e.message : e,
-    );
-    result = await new StubProvider().draftReengagement(input);
-  }
+  return { lead, input };
+}
+
+/**
+ * Persist a completed draft result: score voice fidelity, log the AgentRun,
+ * supersede prior pending drafts, create the new draft + variants, and advance
+ * the lead to AWAITING_APPROVAL. Shared by realtime and batched paths.
+ * costMultiplier covers the Message Batches discount (batched runs bill 50%).
+ */
+export async function persistDraftResult(opts: {
+  orgId: string;
+  leadId: string;
+  lead: Lead;
+  input: DraftInput;
+  result: DraftResult;
+  startMs: number;
+  costMultiplier?: number;
+}) {
+  const { orgId, leadId, lead, input, result, startMs, costMultiplier = 1 } = opts;
 
   // M9: score each variant's voice fidelity against the operator's own past
   // emails — deterministic, no extra model call — so approval can show the proof.
-  const sampleTexts = voiceSamples.map((m) => m.content);
   const fidelity = result.variants.map((v) =>
-    computeVoiceFidelity({ body: v.body, voice, voiceSamples: sampleTexts, confidence: v.confidence }),
+    computeVoiceFidelity({ body: v.body, voice: input.voice, voiceSamples: input.voiceSamples, confidence: v.confidence }),
   );
 
   // Act: persist the audit run, supersede old drafts, create the new draft.
@@ -170,9 +171,9 @@ export async function generateDraftsForLead(opts: {
         completionTokens: result.usage.completionTokens,
         costUsd:
           result.provider === "anthropic"
-            ? estimateCostUsd(result.model, result.usage.promptTokens, result.usage.completionTokens)
+            ? estimateCostUsd(result.model, result.usage.promptTokens, result.usage.completionTokens) * costMultiplier
             : 0,
-        latencyMs: Date.now() - start,
+        latencyMs: Date.now() - startMs,
       },
     });
 
@@ -215,6 +216,38 @@ export async function generateDraftsForLead(opts: {
   });
 
   return draft;
+}
+
+/**
+ * Generate re-engagement drafts for one lead and queue them for approval.
+ *
+ * Hard rails enforced here, never bypassable:
+ *  - refuse if the lead is opted-out / do-not-contact / bounced / already booked,
+ *  - refuse if the lead's email is on the org suppression list.
+ * On success: supersede any prior pending draft, persist Draft + variants, log an
+ * AgentRun, and move the lead to AWAITING_APPROVAL. No email is sent (that's M3).
+ */
+export async function generateDraftsForLead(opts: DraftContextOpts) {
+  const start = Date.now();
+  const { lead, input } = await buildDraftContext(opts);
+
+  // Reason: call the provider (Claude or stub). If a keyed provider fails at
+  // request time (bad/expired key, quota, upstream outage), fall back to the
+  // deterministic stub so the operator still gets a sendable, grounded draft
+  // instead of a dead button. The failure is logged for diagnosis.
+  const provider = await getLLMProvider();
+  let result;
+  try {
+    result = await provider.draftReengagement(input);
+  } catch (e) {
+    console.error(
+      `[draft] provider "${provider.name}" failed for lead ${opts.leadId}; falling back to stub:`,
+      e instanceof Error ? e.message : e,
+    );
+    result = await new StubProvider().draftReengagement(input);
+  }
+
+  return persistDraftResult({ orgId: opts.orgId, leadId: opts.leadId, lead, input, result, startMs: start });
 }
 
 // Human sentence for the operator-facing activity log — never debug key=value
