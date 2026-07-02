@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { sendDueReminders, sweepNoShows } from "@/lib/agent/reminders";
+import { reportError } from "@/lib/observability/report";
 
 /**
  * §6 no-show defense — the hourly job. Reminders (24h + 1h before a call) need a
@@ -24,8 +25,13 @@ async function runJob(req: NextRequest) {
   let reminded = 0;
   let noShows = 0;
   for (const org of orgs) {
-    reminded += (await sendDueReminders(org.id)).sent;
-    noShows += (await sweepNoShows(org.id)).flagged;
+    try {
+      reminded += (await sendDueReminders(org.id)).sent;
+      noShows += (await sweepNoShows(org.id)).flagged;
+    } catch (e) {
+      // One org's failure is reported and skipped — never aborts the whole run.
+      reportError(e, { job: "reminders", orgId: org.id });
+    }
   }
   return NextResponse.json({ ok: true, orgs: orgs.length, reminded, noShows });
 }

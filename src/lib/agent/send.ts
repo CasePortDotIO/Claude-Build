@@ -5,6 +5,7 @@ import { assertContactable, ComplianceError, complianceFooter, withComplianceFoo
 import { effectiveDailyCap, isWarmingUp } from "@/lib/compliance/caps";
 import { assertDomainAuthorized, DomainAuthError } from "@/lib/compliance/deliverability";
 import { recordOutcome } from "@/lib/outcomes";
+import { isBillingConfigured, subscriptionActive } from "@/lib/billing/stripe";
 import type { Mailbox } from "@prisma/client";
 
 export class SendError extends Error {
@@ -65,8 +66,15 @@ export async function sendApprovedDraft(opts: { orgId: string; draftId: string }
 
   // CAN-SPAM: a real physical mailing address is required in every email.
   const org = await prisma.org.findUniqueOrThrow({ where: { id: orgId }, select: { name: true, brandName: true, mailingAddress: true, billingStatus: true } });
-  // §9: a canceled/paused workspace sends nothing — cancellation halts sending now.
-  if (org.billingStatus === "canceled" || org.billingStatus === "paused") {
+  // Billing gate. When Stripe is live, paid-only is enforced at the send rail too
+  // (not just app entry) so no path — cron autopilot included — sends for a
+  // workspace that's past_due/incomplete/canceled. When billing isn't configured
+  // (local/dev), fall back to the legacy canceled/paused halt.
+  if (await isBillingConfigured()) {
+    if (!subscriptionActive(org.billingStatus)) {
+      throw new SendError("Sending is paused — this workspace doesn't have an active subscription. Update billing to resume.");
+    }
+  } else if (org.billingStatus === "canceled" || org.billingStatus === "paused") {
     throw new SendError("Sending is off for this workspace (subscription canceled). Reactivate from Account to resume.");
   }
   if (!org.mailingAddress) {

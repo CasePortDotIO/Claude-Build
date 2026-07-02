@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { runAutopilotForOrg } from "@/lib/agent/autopilot";
 import { collectDraftBatches } from "@/lib/agent/draft-batch";
+import { reportError } from "@/lib/observability/report";
 
 /**
  * M17 autopilot — the always-on job. Runs every few hours so fresh leads get
@@ -40,7 +41,7 @@ async function runJob(req: NextRequest) {
     const c = await collectDraftBatches();
     collected = c.drafted;
   } catch (e) {
-    console.error("[autopilot] batch collection failed (will retry next pass):", e instanceof Error ? e.message : e);
+    reportError(e, { job: "autopilot", phase: "batch-collect" });
   }
 
   let synced = 0;
@@ -48,11 +49,16 @@ async function runJob(req: NextRequest) {
   let batched = 0;
   let sent = 0;
   for (const org of orgs) {
-    const r = await runAutopilotForOrg(org.id);
-    synced += r.synced;
-    drafted += r.drafted;
-    batched += r.batched;
-    sent += r.sent;
+    try {
+      const r = await runAutopilotForOrg(org.id);
+      synced += r.synced;
+      drafted += r.drafted;
+      batched += r.batched;
+      sent += r.sent;
+    } catch (e) {
+      // One org's failure is reported and skipped — never aborts the whole run.
+      reportError(e, { job: "autopilot", orgId: org.id });
+    }
   }
 
   return NextResponse.json({ ok: true, orgs: orgs.length, synced, drafted, batched, collected, sent });
