@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { MicrosoftGraphProvider, hasMicrosoftOAuth } from "@/lib/mailbox/microsoft";
+import { buildOAuthState, setOAuthStateCookie } from "@/lib/auth/oauth-state";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -11,6 +12,8 @@ export async function GET(req: NextRequest) {
   if (!(await hasMicrosoftOAuth())) {
     return NextResponse.redirect(new URL(`${fallback}?error=microsoft_not_configured`, process.env.NEXTAUTH_URL));
   }
-  const state = Buffer.from(JSON.stringify({ orgId: session.user.activeOrgId, ret })).toString("base64url");
-  return NextResponse.redirect(await new MicrosoftGraphProvider().getAuthUrl(state));
+  const { state, nonce } = buildOAuthState({ orgId: session.user.activeOrgId, ret });
+  const res = NextResponse.redirect(await new MicrosoftGraphProvider().getAuthUrl(state));
+  setOAuthStateCookie(res, nonce);
+  return res;
 }

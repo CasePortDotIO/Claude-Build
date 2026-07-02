@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { MicrosoftGraphProvider } from "@/lib/mailbox/microsoft";
 import { encryptSecret } from "@/lib/crypto";
+import { readVerifiedOAuthState, clearOAuthStateCookie } from "@/lib/auth/oauth-state";
 
 // Microsoft Graph OAuth callback: exchange the code, ENCRYPT tokens, upsert the
 // MICROSOFT mailbox scoped to the org in `state`.
@@ -16,16 +17,20 @@ export async function GET(req: NextRequest) {
   const stateRaw = req.nextUrl.searchParams.get("state");
   if (!code || !stateRaw) return NextResponse.redirect(new URL("/connections?error=missing_code", base));
 
-  let orgId: string;
-  let dest = "/connections";
-  try {
-    const state = JSON.parse(Buffer.from(stateRaw, "base64url").toString());
-    orgId = state.orgId;
-    if (state.ret === "welcome") dest = "/welcome";
-  } catch {
-    return NextResponse.redirect(new URL("/connections?error=bad_state", base));
+  // CSRF: the state's nonce must match the cookie set at start (constant-time).
+  const state = readVerifiedOAuthState(req, stateRaw);
+  if (!state) {
+    const res = NextResponse.redirect(new URL("/connections?error=bad_state", base));
+    clearOAuthStateCookie(res);
+    return res;
   }
-  if (orgId !== session.user.activeOrgId) return NextResponse.redirect(new URL(`${dest}?error=org_mismatch`, base));
+  const orgId = state.orgId as string;
+  const dest = state.ret === "welcome" ? "/welcome" : "/connections";
+  if (orgId !== session.user.activeOrgId) {
+    const res = NextResponse.redirect(new URL(`${dest}?error=org_mismatch`, base));
+    clearOAuthStateCookie(res);
+    return res;
+  }
 
   try {
     const tokens = await new MicrosoftGraphProvider().exchangeCode(code);
@@ -47,8 +52,12 @@ export async function GET(req: NextRequest) {
         tokenExpiry: tokens.expiry,
       },
     });
-    return NextResponse.redirect(new URL(`${dest}?connected=microsoft`, base));
+    const res = NextResponse.redirect(new URL(`${dest}?connected=microsoft`, base));
+    clearOAuthStateCookie(res);
+    return res;
   } catch {
-    return NextResponse.redirect(new URL(`${dest}?error=exchange_failed`, base));
+    const res = NextResponse.redirect(new URL(`${dest}?error=exchange_failed`, base));
+    clearOAuthStateCookie(res);
+    return res;
   }
 }

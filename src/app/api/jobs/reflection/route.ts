@@ -7,6 +7,7 @@ import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
 import { notifyMorningBrief } from "@/lib/notify";
 import { emailMorningBrief } from "@/lib/agent/digest";
+import { reportError } from "@/lib/observability/report";
 
 /**
  * Nightly reflection job (§8). In production this is invoked on a schedule —
@@ -35,20 +36,25 @@ async function runJob(req: NextRequest) {
   let briefsPushed = 0;
   let briefsEmailed = 0;
   for (const org of orgs) {
-    const res = await runReflection(org.id);
-    totalInsights += res.created;
-    // Follow-up branch: cool leads that went silent past the learned gap.
-    const sweep = await reengagementSweep(org.id);
-    totalCooled += sweep.cooled;
-    // §3: re-verify contacts that have sat unsent >30 days (data decays).
-    await reverifyStale(org.id);
-    // M10: the overnight Morning Brief — the habit-loop trigger, on every channel.
-    const brief = await dailyBrief(org.id);
-    const streak = await engagementStreak(org.id);
-    const slack = await notifyMorningBrief(org.id, brief, streak.current);
-    if (slack.slack) briefsPushed++;
-    const email = await emailMorningBrief(org.id, brief, streak.current);
-    briefsEmailed += email.emailed;
+    try {
+      const res = await runReflection(org.id);
+      totalInsights += res.created;
+      // Follow-up branch: cool leads that went silent past the learned gap.
+      const sweep = await reengagementSweep(org.id);
+      totalCooled += sweep.cooled;
+      // §3: re-verify contacts that have sat unsent >30 days (data decays).
+      await reverifyStale(org.id);
+      // M10: the overnight Morning Brief — the habit-loop trigger, on every channel.
+      const brief = await dailyBrief(org.id);
+      const streak = await engagementStreak(org.id);
+      const slack = await notifyMorningBrief(org.id, brief, streak.current);
+      if (slack.slack) briefsPushed++;
+      const email = await emailMorningBrief(org.id, brief, streak.current);
+      briefsEmailed += email.emailed;
+    } catch (e) {
+      // One org's failure is reported and skipped — never aborts the whole run.
+      reportError(e, { job: "reflection", orgId: org.id });
+    }
   }
   return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed, briefsEmailed });
 }

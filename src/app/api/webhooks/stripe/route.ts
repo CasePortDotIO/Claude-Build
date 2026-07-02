@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhook } from "@/lib/billing/stripe";
 import { getSecret } from "@/lib/config/secrets";
+import { reportError } from "@/lib/observability/report";
 
 /**
  * Stripe webhook — keeps Org.billingStatus + subscription fields in sync with the
@@ -81,8 +82,9 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (err) {
-    console.error("[stripe webhook] handler error:", err);
-    // Still 200 so Stripe doesn't hammer retries on a transient DB blip.
+    // A billing-sync failure is high-signal (a paid customer may not get access)
+    // — surface it to Sentry. Still 200 so Stripe doesn't hammer retries.
+    reportError(err, { source: "stripe-webhook", eventType: event.type });
   }
 
   return NextResponse.json({ received: true });
