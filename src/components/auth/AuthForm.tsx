@@ -51,6 +51,16 @@ export function AuthForm({ mode, notice = null }: { mode: "sign-in" | "sign-up";
 
         {mode === "sign-up" && (
           <>
+            {/* Honeypot: hidden from humans, tempting to naive bots. Real users
+                never see or tab to it; a filled value is treated as a bot. */}
+            <input
+              type="text"
+              name="company_website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute left-[-9999px] h-0 w-0 opacity-0"
+            />
             <Field label="Your name" name="name" type="text" placeholder="Jessica Monroe" />
             <Field label="Workspace name" name="orgName" type="text" placeholder="Monroe Coaching" />
           </>
