@@ -39,7 +39,6 @@ export interface DraftPreview {
   confidence: number;
   subject: string;
   body: string;
-  provider: string;
 }
 
 const ELIGIBLE = new Set<LeadStatus>(["NEW", "RESEARCHED", "COOLED", "SCHEDULED"]);
@@ -283,7 +282,7 @@ function NextMessage({
           <span className="rounded bg-sweep-mist px-2 py-0.5 text-[10.5px] font-semibold capitalize text-sweep">
             {draft.angle}
           </span>
-          <span className="font-mono text-[10.5px] text-on-dark-mute">{Math.round(draft.confidence * 100)}% · {draft.provider}</span>
+          <span className="text-[10.5px] text-on-dark-mute">{Math.round(draft.confidence * 100)}% confident</span>
           <span className="ml-auto text-[10.5px] uppercase tracking-wide text-on-dark-mute">{draft.status.replace(/_/g, " ").toLowerCase()}</span>
         </div>
         <p className="m-0 mb-1.5 text-[13px] font-semibold text-on-dark">{draft.subject}</p>

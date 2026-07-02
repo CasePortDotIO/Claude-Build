@@ -28,7 +28,9 @@ export async function getAiConfig(): Promise<AiConfig> {
   return {
     anthropic: {
       apiKey: aKey ?? "",
-      model: aModel || "claude-opus-4-8",
+      // Sonnet is the drafting default: re-engagement copy doesn't need Opus,
+      // and Sonnet is ~5x cheaper per token. fastModel serves bulk/cron tiers.
+      model: aModel || "claude-sonnet-5",
       fastModel: aFast || "claude-haiku-4-5-20251001",
     },
     voyage: { apiKey: vKey ?? "", model: vModel || "voyage-3" },
@@ -47,6 +49,7 @@ export async function hasVoyage(): Promise<boolean> {
 // agent_runs. Kept here so it's easy to update; approximate, not billing-grade.
 export const MODEL_PRICING: Record<string, { inPerM: number; outPerM: number }> = {
   "claude-opus-4-8": { inPerM: 15, outPerM: 75 },
+  "claude-sonnet-5": { inPerM: 3, outPerM: 15 },
   "claude-sonnet-4-6": { inPerM: 3, outPerM: 15 },
   "claude-haiku-4-5-20251001": { inPerM: 1, outPerM: 5 },
 };
