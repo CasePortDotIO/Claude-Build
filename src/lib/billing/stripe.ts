@@ -68,13 +68,21 @@ export async function createCustomer(opts: { email?: string; name?: string; orgI
   return c.id;
 }
 
+// Trial length cap for the result-gated $0 trial. The trial ends the moment the
+// agent books the Nth call; this is just the safety backstop if it never does
+// (so "pay nothing until it books N calls" stays literally true up to a year).
+const TRIAL_BACKSTOP_DAYS = 365;
+
 export async function createCheckoutSession(opts: {
   customerId: string;
   orgId: string;
   successUrl: string;
   cancelUrl: string;
+  // Result-gated $0 trial: collect the card now, but bill $0 until we end the
+  // trial early on the Nth booked call.
+  trial?: boolean;
 }): Promise<string> {
-  const s = await stripePost<{ url: string }>("/checkout/sessions", form({
+  const fields: Record<string, string | number | undefined> = {
     mode: "subscription",
     customer: opts.customerId,
     "line_items[0][price]": await getSecret("STRIPE_PRICE_ID"),
@@ -84,8 +92,23 @@ export async function createCheckoutSession(opts: {
     client_reference_id: opts.orgId,
     "subscription_data[metadata][orgId]": opts.orgId,
     allow_promotion_codes: "true",
-  }));
+  };
+  if (opts.trial) {
+    fields["subscription_data[trial_period_days]"] = TRIAL_BACKSTOP_DAYS;
+    // Require a card even though $0 is due now, so ending the trial can charge.
+    fields["payment_method_collection"] = "always";
+  }
+  const s = await stripePost<{ url: string }>("/checkout/sessions", form(fields));
   return s.url;
+}
+
+/**
+ * End a subscription's trial immediately — Stripe charges the card on file right
+ * away and moves the subscription to active. Called when the agent books the Nth
+ * call, converting the result-gated $0 trial into paid.
+ */
+export async function endTrialNow(subscriptionId: string): Promise<void> {
+  await stripePost(`/subscriptions/${subscriptionId}`, form({ trial_end: "now", proration_behavior: "none" }));
 }
 
 export async function createPortalSession(opts: { customerId: string; returnUrl: string }): Promise<string> {

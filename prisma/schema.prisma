@@ -77,6 +77,14 @@ model Org {
   leadsDraftedThisPeriod Int      @default(0)
   meterPeriodStart      DateTime  @default(now())
 
+  // Result-gated $0 trial ("pay nothing until it books N calls"). When a trial
+  // subscription starts we stamp trialStartedAt + the call threshold; once the
+  // agent logs that many booked calls, we end the Stripe trial early → first
+  // charge fires and billingStatus flips to active.
+  trialStartedAt        DateTime?
+  trialCallThreshold    Int?      // e.g. 3; null → not a result-gated trial
+  trialConvertedAt      DateTime?
+
   // §10 customer-type / vertical tag (set at onboarding), for privacy-clean
   // aggregate pattern-learning across the outcome log. Never customer-facing.
   vertical String?
@@ -1006,6 +1014,7 @@ enum NotificationKind {
   SEND_FAILED
   OPTED_OUT
   BOUNCED
+  TRIAL_CONVERTED
 }
 
 enum NotificationStatus {

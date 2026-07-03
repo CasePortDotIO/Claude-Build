@@ -9,6 +9,8 @@ import { validateBookingSlot } from "@/lib/calendar/validate";
 import { sendBookingConfirmation } from "@/lib/agent/reminders";
 import { ACTIVE_SLOT_STATUSES } from "@/lib/booking-status";
 import { recordOutcome } from "@/lib/outcomes";
+import { endTrialNow } from "@/lib/billing/stripe";
+import { reportError } from "@/lib/observability/report";
 
 export class BookingError extends Error {
   constructor(message: string) {
@@ -151,5 +153,62 @@ export async function bookCall(opts: {
   // §10: a booked call is the headline conversion.
   await recordOutcome({ orgId, leadId, kind: "BOOKED", valueCents: lead.dealValueCents });
 
+  // Result-gated $0 trial → paid. When the agent books the Nth call during the
+  // trial, end the trial early so Stripe charges the card on file. Best-effort:
+  // never let a billing side effect break the booking that just succeeded.
+  await maybeConvertTrial(orgId).catch((err) => reportError(err, { source: "trial-convert", orgId }));
+
   return booking;
+}
+
+/**
+ * Convert a result-gated $0 trial into a paid subscription once the agent has
+ * booked the org's threshold number of calls. Charges the card on file by ending
+ * the Stripe trial early; the resulting `customer.subscription.updated` webhook
+ * flips billingStatus to "active".
+ *
+ * Idempotent + race-safe: the conversion is claimed with a conditional write
+ * (trialConvertedAt was null) so two calls booked at once can't double-charge.
+ */
+async function maybeConvertTrial(orgId: string): Promise<void> {
+  const org = await prisma.org.findUnique({
+    where: { id: orgId },
+    select: { billingStatus: true, trialCallThreshold: true, trialStartedAt: true, trialConvertedAt: true, stripeSubscriptionId: true },
+  });
+  if (!org || org.billingStatus !== "trial" || org.trialConvertedAt) return;
+  const threshold = org.trialCallThreshold ?? 0;
+  if (threshold <= 0 || !org.stripeSubscriptionId) return;
+
+  // Count real (confirmed) calls booked since the trial began.
+  const booked = await prisma.booking.count({
+    where: {
+      orgId,
+      status: { in: ACTIVE_SLOT_STATUSES },
+      ...(org.trialStartedAt ? { createdAt: { gte: org.trialStartedAt } } : {}),
+    },
+  });
+  if (booked < threshold) return;
+
+  // Claim the conversion atomically — only one booking wins the race.
+  const claimed = await prisma.org.updateMany({
+    where: { id: orgId, trialConvertedAt: null, billingStatus: "trial" },
+    data: { trialConvertedAt: new Date() },
+  });
+  if (claimed.count === 0) return;
+
+  try {
+    await endTrialNow(org.stripeSubscriptionId);
+  } catch (err) {
+    // Release the claim so a later booking can retry the charge.
+    await prisma.org.update({ where: { id: orgId }, data: { trialConvertedAt: null } }).catch(() => {});
+    throw err;
+  }
+
+  await createNotification({
+    orgId,
+    kind: "TRIAL_CONVERTED",
+    title: "Your Warm Sweep just paid for itself",
+    body: `The agent booked ${threshold} calls — your plan is now live.`,
+    actionUrl: "/",
+  });
 }
