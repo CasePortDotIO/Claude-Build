@@ -22,6 +22,9 @@ function mapStatus(s: string): string {
   }
 }
 
+// Result-gated $0 trial: the agent must book this many calls before we charge.
+const TRIAL_CALL_THRESHOLD = 3;
+
 async function orgIdFor(sub: { customer?: string; metadata?: { orgId?: string } }): Promise<string | null> {
   if (sub.metadata?.orgId) return sub.metadata.orgId;
   if (sub.customer) {
@@ -54,9 +57,20 @@ export async function POST(req: NextRequest) {
       const customer = obj.customer as string | undefined;
       const subscription = obj.subscription as string | undefined;
       if (orgId) {
+        // Don't clobber a result-gated trial: the subscription.created event
+        // (status "trialing") is the source of truth for billingStatus. Here we
+        // only attach the customer/subscription ids and grant access if this
+        // checkout wasn't a trial. "trial" already grants access via the gate.
+        const existing = await prisma.org.findUnique({ where: { id: orgId }, select: { billingStatus: true } });
+        const keepTrial = existing?.billingStatus === "trial";
         await prisma.org.update({
           where: { id: orgId },
-          data: { billingStatus: "active", canceledAt: null, ...(customer ? { stripeCustomerId: customer } : {}), ...(subscription ? { stripeSubscriptionId: subscription } : {}) },
+          data: {
+            ...(keepTrial ? {} : { billingStatus: "active" }),
+            canceledAt: null,
+            ...(customer ? { stripeCustomerId: customer } : {}),
+            ...(subscription ? { stripeSubscriptionId: subscription } : {}),
+          },
         });
       }
     } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
@@ -64,6 +78,18 @@ export async function POST(req: NextRequest) {
       const orgId = await orgIdFor(sub);
       if (orgId) {
         const status = mapStatus(sub.status ?? "");
+        // On a trialing subscription, stamp the result-gated trial contract:
+        // which plan it converts to, and how many booked calls end the trial.
+        // trialStartedAt is only set once (the first time we see it trialing).
+        let trialFields: Record<string, unknown> = {};
+        if (status === "trial") {
+          const org = await prisma.org.findUnique({ where: { id: orgId }, select: { trialStartedAt: true } });
+          trialFields = {
+            planTier: "CONTINUITY",
+            trialCallThreshold: TRIAL_CALL_THRESHOLD,
+            ...(org?.trialStartedAt ? {} : { trialStartedAt: new Date() }),
+          };
+        }
         await prisma.org.update({
           where: { id: orgId },
           data: {
@@ -72,6 +98,7 @@ export async function POST(req: NextRequest) {
             stripePriceId: sub.items?.data?.[0]?.price?.id,
             currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : undefined,
             canceledAt: status === "canceled" ? new Date() : null,
+            ...trialFields,
           },
         });
       }

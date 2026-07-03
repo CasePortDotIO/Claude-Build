@@ -39,6 +39,9 @@ export async function startCheckoutAction(): Promise<BillingActionResult> {
       orgId: ctx.orgId,
       successUrl: `${baseUrl()}/account?checkout=success`,
       cancelUrl: `${baseUrl()}/account?checkout=cancelled`,
+      // Result-gated $0 trial: card collected now, $0 due today, charged only
+      // once the agent books the threshold number of calls.
+      trial: true,
     });
     return { ok: true, url };
   } catch (err) {

@@ -71,13 +71,19 @@ export function BillingWall({
         Activate {orgName}
       </h1>
       <p className="m-0 mb-6 text-[14px] leading-[1.6] text-muted">
-        The Warm Sweep is a paid product. Start your subscription to unlock your workspace — drafting, sending, replies,
-        and booked calls.
+        Turn on your workspace and let the agent go to work — drafting, sending, replies, and booked calls.
+        You pay <span className="font-semibold text-ink">nothing until it books your first 3 calls</span>.
       </p>
 
-      <div className="mb-6 flex items-baseline justify-between rounded-xl border border-line-2 bg-cream-head px-4 py-3.5">
-        <span className="font-heading text-[14.5px] font-semibold text-ink">{planName}</span>
-        {priceLabel && <span className="text-[14px] font-semibold text-sweep">{priceLabel}</span>}
+      <div className="mb-6 rounded-xl border border-line-2 bg-cream-head px-4 py-3.5">
+        <div className="flex items-baseline justify-between">
+          <span className="font-heading text-[14.5px] font-semibold text-ink">{planName}</span>
+          <span className="text-[15px] font-bold text-sweep">$0 today</span>
+        </div>
+        <p className="m-0 mt-1.5 text-[12.5px] leading-[1.5] text-muted">
+          {priceLabel ? <>Then {priceLabel} once it has booked 3 calls for you. </> : <>Billed only after it has booked 3 calls for you. </>}
+          Cancel anytime before then and you&apos;re never charged.
+        </p>
       </div>
 
       {isAdmin ? (
@@ -86,18 +92,18 @@ export function BillingWall({
           disabled={pending}
           className="w-full rounded-lg bg-sweep px-4 py-3 font-heading text-[14px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
         >
-          {pending ? <SpinnerLabel>Starting checkout…</SpinnerLabel> : "Subscribe to continue"}
+          {pending ? <SpinnerLabel>Starting…</SpinnerLabel> : "Start free — pay only when it books calls"}
         </button>
       ) : (
         <p className="m-0 rounded-lg border border-line-2 bg-cream px-4 py-3 text-[13px] text-muted">
-          Ask a workspace admin to start the subscription. You&apos;ll get access as soon as it&apos;s active.
+          Ask a workspace admin to switch it on. You&apos;ll get access the moment they do — there&apos;s nothing to pay to start.
         </p>
       )}
 
       {error && <p className="m-0 mt-3 text-[13px] font-medium text-ember">{error}</p>}
 
       <div className="mt-6 flex items-center justify-between border-t border-line-2 pt-4 text-[12.5px]">
-        <span className="text-muted-3">Secure checkout via Stripe</span>
+        <span className="text-muted-3">$0 today · secured by Stripe</span>
         <button onClick={() => signOut({ callbackUrl: "/sign-in" })} className="font-semibold text-muted hover:text-ink hover:underline">
           Sign out
         </button>
