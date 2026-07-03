@@ -69,6 +69,14 @@ model Org {
   billingStatus    String @default("incomplete") // incomplete | active | trial | past_due | paused | canceled
   canceledAt       DateTime? // §9 self-serve cancellation timestamp
 
+  // Entitlements / margin governance. planTier is set explicitly by the Stripe
+  // webhook per purchased price (null → derived from billingStatus). The meter
+  // counts fresh leads DRAFTED this billing period; the per-tier soft ceiling is
+  // fair-use, the hard ceiling is the kill-switch that protects LLM-cost margin.
+  planTier              String?   // NONE | TRIAL | FRONT_END | OTO1 | CONTINUITY | PERFORMANCE | RESELLER
+  leadsDraftedThisPeriod Int      @default(0)
+  meterPeriodStart      DateTime  @default(now())
+
   // §10 customer-type / vertical tag (set at onboarding), for privacy-clean
   // aggregate pattern-learning across the outcome log. Never customer-facing.
   vertical String?
