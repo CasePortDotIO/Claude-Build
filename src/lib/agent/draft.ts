@@ -6,15 +6,13 @@ import { defaultVoiceProfile } from "@/lib/agent/voice";
 import { computeVoiceFidelity } from "@/lib/agent/voice-match";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { assignCohort } from "@/lib/agent/rollups";
+import { assertDraftAllowed, recordDraft } from "@/lib/billing/meter";
+import { DraftGuardError } from "@/lib/agent/draft-errors";
 import type { DraftInput, DraftResult, VoiceProfileShape } from "@/lib/ai/types";
 import type { Lead } from "@prisma/client";
 
-export class DraftGuardError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "DraftGuardError";
-  }
-}
+// Re-exported so existing importers (autopilot, follow-ups, actions) are unaffected.
+export { DraftGuardError };
 
 export function buildOptOutLine(): string {
   // Plain-text opt-out in every email (§5/§9). The CAN-SPAM physical address is
@@ -60,6 +58,9 @@ export async function buildDraftContext(opts: DraftContextOpts): Promise<{ lead:
 
   const lead = await prisma.lead.findFirst({ where: { id: leadId, orgId } });
   if (!lead) throw new DraftGuardError("Lead not found in this workspace.");
+
+  // Margin kill-switch: refuse once the org hits its plan's monthly draft cap.
+  await assertDraftAllowed(orgId);
 
   // Single contactability gate (suppression + opt-out + DNC + terminal).
   try {
@@ -214,6 +215,12 @@ export async function persistDraftResult(opts: {
 
     return { ...created, selectedVariantId: best?.id ?? null };
   });
+
+  // Count against the throughput meter only for real (LLM) drafts — the stub
+  // fallback is free and must not consume a customer's paid allowance.
+  if (result.provider === "anthropic") {
+    await recordDraft(orgId);
+  }
 
   return draft;
 }
