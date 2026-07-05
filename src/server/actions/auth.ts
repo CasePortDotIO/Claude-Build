@@ -71,11 +71,14 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
 
   // Private-beta comp: invited testers (TRIAL_COMP_EMAILS) start on a free trial
   // so they sail past the paid-only paywall; everyone else starts "incomplete".
-  const billingStatus = isCompedEmail(email) ? "trial" : undefined;
+  // Comps also get the full CONTINUITY tier so entitlement gates don't cap the
+  // beta experience to the fallback TRIAL limits.
+  const comped = isCompedEmail(email);
+  const billingStatus = comped ? "trial" : undefined;
 
   const orgId = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({ data: { name, email, passwordHash } });
-    const org = await tx.org.create({ data: { name: orgName, slug, type: "CLIENT", ...(billingStatus ? { billingStatus } : {}) } });
+    const org = await tx.org.create({ data: { name: orgName, slug, type: "CLIENT", ...(billingStatus ? { billingStatus } : {}), ...(comped ? { planTier: "CONTINUITY" } : {}) } });
     await tx.membership.create({ data: { userId: user.id, orgId: org.id, role: "CLIENT_ADMIN" } });
     await tx.auditLog.create({
       data: { orgId: org.id, actorId: user.id, action: "org.create", targetType: "Org", targetId: org.id },

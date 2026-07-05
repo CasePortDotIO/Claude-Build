@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { auth, updateSession } from "@/lib/auth";
 import { requireOrg } from "@/lib/auth-helpers";
 import { agencyForUser } from "@/lib/agency";
+import { assertEntitled } from "@/lib/billing/entitle";
+import { EntitlementError } from "@/lib/billing/entitlement-errors";
 import type { Role } from "@prisma/client";
 
 export interface OrgActionResult {
@@ -42,6 +44,15 @@ export async function createClientAction(opts: { name: string; brandName?: strin
   // Authorization: must administer an agency (works regardless of active org).
   const agency = await agencyForUser(ctx.userId, ctx.orgId);
   if (!agency) return { ok: false, error: "Only agency admins can add clients." };
+
+  // Entitlement gate — the reseller tier caps how many client accounts an agency
+  // can run (Standard 15, Agency unlimited). Unenforced when billing isn't set up.
+  try {
+    await assertEntitled(agency.id, "subaccount.create");
+  } catch (e) {
+    if (e instanceof EntitlementError) return { ok: false, error: e.message };
+    throw e;
+  }
 
   const name = opts.name.trim();
   if (!name) return { ok: false, error: "Client name is required." };
