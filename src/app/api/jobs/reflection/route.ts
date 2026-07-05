@@ -7,6 +7,7 @@ import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
 import { notifyMorningBrief } from "@/lib/notify";
 import { emailMorningBrief } from "@/lib/agent/digest";
+import { evaluateGuarantees } from "@/lib/guarantee";
 import { reportError } from "@/lib/observability/report";
 
 /**
@@ -56,7 +57,17 @@ async function runJob(req: NextRequest) {
       reportError(e, { job: "reflection", orgId: org.id });
     }
   }
-  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed, briefsEmailed });
+
+  // Settle any guarantee windows that closed today + backfill new subscribers.
+  // Self-contained (its own per-org try/catch) so it can't abort the brief run.
+  let guarantees = { opened: 0, met: 0, missed: 0 };
+  try {
+    guarantees = await evaluateGuarantees(new Date());
+  } catch (e) {
+    reportError(e, { job: "reflection.guarantees" });
+  }
+
+  return NextResponse.json({ ok: true, orgs: orgs.length, insights: totalInsights, cooled: totalCooled, briefsPushed, briefsEmailed, guarantees });
 }
 
 // Vercel Cron uses GET; external schedulers may POST. Both require the secret.

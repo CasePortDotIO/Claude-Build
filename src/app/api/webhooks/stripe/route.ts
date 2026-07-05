@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhook } from "@/lib/billing/stripe";
 import { tierForPrice } from "@/lib/billing/entitle";
+import { ensureGuaranteeWindow } from "@/lib/guarantee";
 import { getSecret } from "@/lib/config/secrets";
 import { reportError } from "@/lib/observability/report";
 
@@ -75,11 +76,12 @@ export async function POST(req: NextRequest) {
         });
       }
     } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
-      const sub = obj as { id?: string; status?: string; customer?: string; metadata?: { orgId?: string }; current_period_end?: number; items?: { data?: { price?: { id?: string } }[] } };
+      const sub = obj as { id?: string; status?: string; customer?: string; metadata?: { orgId?: string }; current_period_end?: number; items?: { data?: { price?: { id?: string; unit_amount?: number } }[] } };
       const orgId = await orgIdFor(sub);
       if (orgId) {
         const status = mapStatus(sub.status ?? "");
-        const priceId = sub.items?.data?.[0]?.price?.id;
+        const price = sub.items?.data?.[0]?.price;
+        const priceId = price?.id;
         // Map the purchased price → the tier it unlocks (the Entitlement Matrix
         // key). Unknown price → null, and we leave planTier untouched so
         // resolveTier derives it from billing state (the legacy single plan).
@@ -98,6 +100,11 @@ export async function POST(req: NextRequest) {
         } else if (mappedTier) {
           tierFields = { planTier: mappedTier };
         }
+        // Triple-Lock leg 3: lock the price for life on the first paid activation.
+        if (status === "active" && typeof price?.unit_amount === "number") {
+          const cur = await prisma.org.findUnique({ where: { id: orgId }, select: { rateLockedCents: true } });
+          if (cur && cur.rateLockedCents == null) tierFields = { ...tierFields, rateLockedCents: price.unit_amount };
+        }
         await prisma.org.update({
           where: { id: orgId },
           data: {
@@ -109,6 +116,8 @@ export async function POST(req: NextRequest) {
             ...tierFields,
           },
         });
+        // Open the booked-call guarantee window once they're a paying customer.
+        if (status === "active") await ensureGuaranteeWindow(orgId).catch(() => {});
       }
     } else if (event.type === "customer.subscription.deleted") {
       const orgId = await orgIdFor(obj as { customer?: string; metadata?: { orgId?: string } });

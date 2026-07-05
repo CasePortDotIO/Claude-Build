@@ -98,6 +98,13 @@ model Org {
   // lib/guarantee.ts; the threshold is never hard-coded anywhere else.
   guaranteeCalls Int?
 
+  // Guarantee engine remedies. guaranteeCreditMonths = free months owed when a
+  // monthly booked-calls guarantee is missed (Triple-Lock leg 2); the billing
+  // path applies them before charging. rateLockedCents = the price locked for
+  // life at conversion (Triple-Lock leg 3) — renewals must never charge above it.
+  guaranteeCreditMonths Int  @default(0)
+  rateLockedCents       Int?
+
   // CAN-SPAM: a real physical mailing address shown in every email (enforced M5).
   mailingAddress String?
 
@@ -138,6 +145,9 @@ model Org {
 
   // C5: in-app notification center (org-scoped activity alerts).
   notifications Notification[]
+
+  // Guarantee engine: rolling windows that settle "N booked calls or the remedy".
+  guaranteeLedgers GuaranteeLedger[]
 
   // Batched autopilot drafting (Anthropic Message Batches — 50% token discount).
   draftBatches DraftBatch[]
@@ -1015,6 +1025,50 @@ enum NotificationKind {
   OPTED_OUT
   BOUNCED
   TRIAL_CONVERTED
+  GUARANTEE_MET
+  GUARANTEE_MISSED
+}
+
+// ── Guarantee engine ──────────────────────────────────────────────────────────
+// The performance guarantees ("3 booked calls in 30 days or keep sweeping free",
+// "fewer than 5 booked calls this month → month free") are a real subsystem, not
+// copy: each window is a ledger row that counts QUALIFIED booked calls and settles
+// to MET or MISSED, applying the tier's remedy on a miss.
+
+enum GuaranteeType {
+  THREE_CALL // founding / own-it: ≥3 booked calls in 30 days
+  FIVE_CALL_MONTH // continuity Triple-Lock leg 2: ≥5 booked calls per month
+}
+
+enum GuaranteeState {
+  ACTIVE // window open, still accruing
+  MET // threshold reached — nothing owed
+  MISSED // threshold not reached — remedy applied
+}
+
+enum RemedyKind {
+  FREE_EXTENSION // keep sweeping free for another window (first miss, one-shot tiers)
+  FREE_MONTH // credit a free month (recurring tiers)
+  REFUND_DUE // refund obligation recorded for an operator to approve (never auto-fired)
+}
+
+model GuaranteeLedger {
+  id          String          @id @default(cuid())
+  orgId       String
+  org         Org             @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  type        GuaranteeType
+  threshold   Int // qualified booked calls required in the window
+  periodStart DateTime
+  periodEnd   DateTime
+  status      GuaranteeState  @default(ACTIVE)
+  bookedCount Int             @default(0) // qualified calls counted at settlement
+  remedy      RemedyKind? // set when MISSED
+  settledAt   DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([orgId, status])
+  @@index([status, periodEnd])
 }
 
 enum NotificationStatus {

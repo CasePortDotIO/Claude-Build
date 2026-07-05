@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { guaranteeStatus, GUARANTEE_CALLS_DEFAULT, guaranteeThreshold } from "@/lib/guarantee";
+import { guaranteeStatus, GUARANTEE_CALLS_DEFAULT, guaranteeThreshold, guaranteeForTier } from "@/lib/guarantee";
 
 const NOW = new Date("2026-06-15T12:00:00Z");
 const DAY = 86_400_000;
@@ -38,6 +38,14 @@ describe("§8 guarantee tracker", () => {
   it("uses the single default threshold when no override is set", () => {
     expect(guaranteeThreshold({ guaranteeCalls: null })).toBe(GUARANTEE_CALLS_DEFAULT);
     expect(guaranteeThreshold({ guaranteeCalls: 5 })).toBe(5);
+  });
+
+  it("maps each tier to its booked-call guarantee (ledger, not copy)", () => {
+    expect(guaranteeForTier("FRONT_END")).toMatchObject({ type: "THREE_CALL", threshold: 3, recurring: false });
+    expect(guaranteeForTier("OTO1")).toMatchObject({ type: "THREE_CALL", threshold: 3 });
+    expect(guaranteeForTier("CONTINUITY")).toMatchObject({ type: "FIVE_CALL_MONTH", threshold: 5, recurring: true });
+    expect(guaranteeForTier("PERFORMANCE")).toBeNull(); // pay-per-result, not a call guarantee
+    expect(guaranteeForTier("NONE")).toBeNull();
   });
 
   it("counts only bookings inside the rolling 30-day window", async () => {
