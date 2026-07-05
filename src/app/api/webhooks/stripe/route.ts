@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyWebhook } from "@/lib/billing/stripe";
+import { verifyWebhook, meteredPriceId } from "@/lib/billing/stripe";
 import { tierForPrice } from "@/lib/billing/entitle";
+import { grantOneTimeTier } from "@/lib/billing/grant";
 import { ensureGuaranteeWindow } from "@/lib/guarantee";
 import { getSecret } from "@/lib/config/secrets";
 import { reportError } from "@/lib/observability/report";
@@ -58,11 +59,17 @@ export async function POST(req: NextRequest) {
       const orgId = (obj.client_reference_id as string) || (obj.metadata as { orgId?: string })?.orgId || null;
       const customer = obj.customer as string | undefined;
       const subscription = obj.subscription as string | undefined;
-      if (orgId) {
-        // Don't clobber a result-gated trial: the subscription.created event
-        // (status "trialing") is the source of truth for billingStatus. Here we
-        // only attach the customer/subscription ids and grant access if this
-        // checkout wasn't a trial. "trial" already grants access via the gate.
+      const mode = obj.mode as string | undefined;
+      const meta = (obj.metadata as { tier?: string; bump?: string }) ?? {};
+      if (orgId && mode === "payment" && (meta.tier === "FRONT_END" || meta.tier === "OTO1")) {
+        // One-time purchase (Founding $27 / +$17 bump, Own-It $197): no
+        // subscription — grant the tier + lifetime access + its guarantee.
+        await grantOneTimeTier({ orgId, tier: meta.tier, bump: meta.bump === "1", customerId: customer });
+      } else if (orgId) {
+        // Subscription checkout. Don't clobber a result-gated trial: the
+        // subscription.created event (status "trialing") is the source of truth
+        // for billingStatus. Here we only attach the customer/subscription ids and
+        // grant access if this checkout wasn't a trial ("trial" grants access too).
         const existing = await prisma.org.findUnique({ where: { id: orgId }, select: { billingStatus: true } });
         const keepTrial = existing?.billingStatus === "trial";
         await prisma.org.update({
@@ -76,7 +83,7 @@ export async function POST(req: NextRequest) {
         });
       }
     } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
-      const sub = obj as { id?: string; status?: string; customer?: string; metadata?: { orgId?: string }; current_period_end?: number; items?: { data?: { price?: { id?: string; unit_amount?: number } }[] } };
+      const sub = obj as { id?: string; status?: string; customer?: string; metadata?: { orgId?: string }; current_period_end?: number; items?: { data?: { id?: string; price?: { id?: string; unit_amount?: number } }[] } };
       const orgId = await orgIdFor(sub);
       if (orgId) {
         const status = mapStatus(sub.status ?? "");
@@ -104,6 +111,13 @@ export async function POST(req: NextRequest) {
         if (status === "active" && typeof price?.unit_amount === "number") {
           const cur = await prisma.org.findUnique({ where: { id: orgId }, select: { rateLockedCents: true } });
           if (cur && cur.rateLockedCents == null) tierFields = { ...tierFields, rateLockedCents: price.unit_amount };
+        }
+        // Performance plan: remember the metered subscription item so each booked
+        // call can report one usage unit against it.
+        const metered = await meteredPriceId();
+        if (metered) {
+          const meteredItem = sub.items?.data?.find((it) => it.price?.id === metered)?.id;
+          if (meteredItem) tierFields = { ...tierFields, meteredSubscriptionItemId: meteredItem };
         }
         await prisma.org.update({
           where: { id: orgId },
