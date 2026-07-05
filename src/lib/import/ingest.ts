@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { assertPriorContact, PriorContactError } from "@/lib/import/prior-contact-gate";
+import { assertEntitled } from "@/lib/billing/entitle";
+import { EntitlementError } from "@/lib/billing/entitlement-errors";
 import { getEmailVerifier } from "@/lib/verify";
 import type { MappedLead } from "@/lib/import/mapping";
 import type { ConsentBasis, Prisma, Reachability } from "@prisma/client";
@@ -50,6 +52,15 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
   }
   if (leads.length === 0) {
     return { ok: false, error: "No valid leads to import.", ...empty };
+  }
+
+  // (1b) Entitlement gate — each import is a "list"; a single-list tier can't
+  // create a second one. Unenforced when billing isn't configured (dev/CI).
+  try {
+    await assertEntitled(opts.orgId, "lists.create");
+  } catch (e) {
+    if (e instanceof EntitlementError) return { ok: false, error: e.message, ...empty };
+    throw e;
   }
 
   // (2) Filter against suppression list + existing org leads (all org-scoped).

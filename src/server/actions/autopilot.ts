@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireOrg } from "@/lib/auth-helpers";
 import { assertRole } from "@/lib/roles";
+import { assertEntitled } from "@/lib/billing/entitle";
+import { EntitlementError } from "@/lib/billing/entitlement-errors";
 
 export interface AutopilotActionResult {
   ok: boolean;
@@ -28,6 +30,19 @@ export async function setAutopilotAction(opts: {
     assertRole(ctx, "CLIENT_ADMIN");
   } catch {
     return { ok: false, error: "Only an admin can change autopilot." };
+  }
+
+  // Entitlement gate — turning ON any autopilot autonomy is an always-on
+  // capability (not available on one-shot / manual tiers). Turning things OFF is
+  // always allowed. Unenforced when billing isn't configured.
+  const enablingAutonomy = opts.sync === true || opts.draft === true || opts.send === true || opts.approve === true;
+  if (enablingAutonomy) {
+    try {
+      await assertEntitled(ctx.orgId, "autopilot.alwaysOn");
+    } catch (e) {
+      if (e instanceof EntitlementError) return { ok: false, error: e.message };
+      throw e;
+    }
   }
 
   await prisma.org.update({

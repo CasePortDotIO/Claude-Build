@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveTier, planLimits, meterPeriodElapsed, readMeter, PLAN_LIMITS } from "@/lib/billing/entitlements";
+import { resolveTier, planLimits, meterPeriodElapsed, readMeter, PLAN_LIMITS, capabilityAllowed } from "@/lib/billing/entitlements";
 
 describe("entitlements", () => {
   it("derives tier from billing state when planTier is unset", () => {
@@ -28,6 +28,44 @@ describe("entitlements", () => {
   it("front-end tier is single-list and small (the $27 wow)", () => {
     expect(PLAN_LIMITS.FRONT_END.listLimit).toBe(1);
     expect(PLAN_LIMITS.FRONT_END.monthlyLeadsHard).toBe(150);
+  });
+
+  it("matrix matches the Promise Ledger — founding single-pass/DFY, own-it manual/multi", () => {
+    // Founding $27: single-pass sweep, DFY, not always-on.
+    expect(PLAN_LIMITS.FRONT_END.maxTouches).toBe(1);
+    expect(PLAN_LIMITS.FRONT_END.dfySetup).toBe(true);
+    expect(PLAN_LIMITS.FRONT_END.alwaysOn).toBe(false);
+    // Own-It $197: buyer-operated — multi-touch, unlimited lists, but MANUAL (not always-on), no DFY.
+    expect(PLAN_LIMITS.OTO1.maxTouches).toBeGreaterThan(1);
+    expect(PLAN_LIMITS.OTO1.unlimitedLists).toBe(true);
+    expect(PLAN_LIMITS.OTO1.alwaysOn).toBe(false);
+    expect(PLAN_LIMITS.OTO1.dfySetup).toBe(false);
+    // Continuity $297: always-on + speed-to-lead + monthly report.
+    expect(PLAN_LIMITS.CONTINUITY.alwaysOn).toBe(true);
+    expect(PLAN_LIMITS.CONTINUITY.speedToLead).toBe(true);
+    expect(PLAN_LIMITS.CONTINUITY.monthlyReport).toBe(true);
+    // Reseller Standard 15 clients; Agency unlimited.
+    expect(PLAN_LIMITS.RESELLER.subAccounts).toBe(15);
+    expect(PLAN_LIMITS.AGENCY.subAccounts).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("capabilityAllowed gates lists by count and fails closed on unknown caps", () => {
+    // Single-list tier: first list allowed, second denied.
+    expect(capabilityAllowed(PLAN_LIMITS.FRONT_END, "lists.create", 0)).toBe(true);
+    expect(capabilityAllowed(PLAN_LIMITS.FRONT_END, "lists.create", 1)).toBe(false);
+    // Unlimited-list tier: always allowed regardless of count.
+    expect(capabilityAllowed(PLAN_LIMITS.CONTINUITY, "lists.create", 999)).toBe(true);
+    // Reseller sub-accounts capped at 15.
+    expect(capabilityAllowed(PLAN_LIMITS.RESELLER, "subaccount.create", 14)).toBe(true);
+    expect(capabilityAllowed(PLAN_LIMITS.RESELLER, "subaccount.create", 15)).toBe(false);
+    // Always-on only on recurring/manual-plus tiers.
+    expect(capabilityAllowed(PLAN_LIMITS.OTO1, "autopilot.alwaysOn")).toBe(false);
+    expect(capabilityAllowed(PLAN_LIMITS.CONTINUITY, "autopilot.alwaysOn")).toBe(true);
+    // Multi-touch gated by depth.
+    expect(capabilityAllowed(PLAN_LIMITS.FRONT_END, "sequence.multitouch")).toBe(false);
+    expect(capabilityAllowed(PLAN_LIMITS.OTO1, "sequence.multitouch")).toBe(true);
+    // Unknown capability → deny.
+    expect(capabilityAllowed(PLAN_LIMITS.CONTINUITY, "bogus.capability" as never)).toBe(false);
   });
 
   it("rolls the meter period at a new calendar month", () => {

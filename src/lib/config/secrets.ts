@@ -11,6 +11,7 @@ import { encryptSecret, decryptSecret } from "@/lib/crypto";
 export const SECRET_KEYS = [
   "STRIPE_SECRET_KEY",
   "STRIPE_PRICE_ID",
+  "STRIPE_PRICE_TIERS",
   "STRIPE_WEBHOOK_SECRET",
   "STRIPE_PLAN_NAME",
   "STRIPE_PLAN_PRICE_LABEL",

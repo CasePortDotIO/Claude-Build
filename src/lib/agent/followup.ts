@@ -1,6 +1,7 @@
 import { prisma, withDbRetry } from "@/lib/prisma";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
 import { transition } from "@/lib/agent/state-machine";
+import { resolveLimits } from "@/lib/billing/entitle";
 
 /**
  * Multi-touch follow-up engine. Most reactivations don't happen on the first
@@ -37,6 +38,11 @@ export async function runFollowupsForOrg(orgId: string, now: Date = new Date()):
   const learning = await prisma.orgLearning.findUnique({ where: { orgId }, select: { followUpGapDays: true } });
   const gapMs = Math.max(1, learning?.followUpGapDays ?? 3) * DAY_MS;
 
+  // Sequence depth is a tier entitlement: single-pass tiers (maxTouches = 1) get
+  // no follow-ups; multi-touch tiers get up to (maxTouches - 1). Falls back to
+  // the default depth when billing isn't configured (dev/CI).
+  const maxTouches = (await resolveLimits(orgId)).maxTouches || MAX_TOUCHES;
+
   // Candidates: contacted, waiting, no genuine reply yet.
   const leads = await prisma.lead.findMany({
     where: { orgId, status: "AWAITING_REPLY" },
@@ -65,7 +71,7 @@ export async function runFollowupsForOrg(orgId: string, now: Date = new Date()):
     }
 
     // Touches exhausted (the breakup already went out): close the file gracefully.
-    if (touches >= MAX_TOUCHES) {
+    if (touches >= maxTouches) {
       try {
         await prisma.lead.update({ where: { id: lead.id }, data: { status: transition(lead.status, "CLOSE_LOST") } });
         result.closed += 1;
@@ -88,7 +94,7 @@ export async function runFollowupsForOrg(orgId: string, now: Date = new Date()):
           orgId,
           leadId: lead.id,
           operatorName,
-          followUp: { touch, isFinal: touch >= MAX_TOUCHES, previousSubject: outbound[0].subject ?? null },
+          followUp: { touch, isFinal: touch >= maxTouches, previousSubject: outbound[0].subject ?? null },
           bulk: true,
         }),
       );

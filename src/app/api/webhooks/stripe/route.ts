@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyWebhook } from "@/lib/billing/stripe";
+import { tierForPrice } from "@/lib/billing/entitle";
 import { getSecret } from "@/lib/config/secrets";
 import { reportError } from "@/lib/observability/report";
 
@@ -78,27 +79,34 @@ export async function POST(req: NextRequest) {
       const orgId = await orgIdFor(sub);
       if (orgId) {
         const status = mapStatus(sub.status ?? "");
+        const priceId = sub.items?.data?.[0]?.price?.id;
+        // Map the purchased price → the tier it unlocks (the Entitlement Matrix
+        // key). Unknown price → null, and we leave planTier untouched so
+        // resolveTier derives it from billing state (the legacy single plan).
+        const mappedTier = await tierForPrice(priceId);
         // On a trialing subscription, stamp the result-gated trial contract:
         // which plan it converts to, and how many booked calls end the trial.
         // trialStartedAt is only set once (the first time we see it trialing).
-        let trialFields: Record<string, unknown> = {};
+        let tierFields: Record<string, unknown> = {};
         if (status === "trial") {
           const org = await prisma.org.findUnique({ where: { id: orgId }, select: { trialStartedAt: true } });
-          trialFields = {
-            planTier: "CONTINUITY",
+          tierFields = {
+            planTier: mappedTier ?? "CONTINUITY",
             trialCallThreshold: TRIAL_CALL_THRESHOLD,
             ...(org?.trialStartedAt ? {} : { trialStartedAt: new Date() }),
           };
+        } else if (mappedTier) {
+          tierFields = { planTier: mappedTier };
         }
         await prisma.org.update({
           where: { id: orgId },
           data: {
             billingStatus: status,
             stripeSubscriptionId: sub.id,
-            stripePriceId: sub.items?.data?.[0]?.price?.id,
+            stripePriceId: priceId,
             currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : undefined,
             canceledAt: status === "canceled" ? new Date() : null,
-            ...trialFields,
+            ...tierFields,
           },
         });
       }
