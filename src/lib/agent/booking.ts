@@ -7,7 +7,7 @@ import { createNotification } from "@/lib/notifications";
 import { slotLabel } from "@/lib/calendar/slots";
 import { validateBookingSlot } from "@/lib/calendar/validate";
 import { sendBookingConfirmation } from "@/lib/agent/reminders";
-import { ACTIVE_SLOT_STATUSES } from "@/lib/booking-status";
+import { ACTIVE_SLOT_STATUSES, QUALIFIED_BOOKING_STATUSES } from "@/lib/booking-status";
 import { recordOutcome } from "@/lib/outcomes";
 import { endTrialNow } from "@/lib/billing/stripe";
 import { reportError } from "@/lib/observability/report";
@@ -179,11 +179,13 @@ async function maybeConvertTrial(orgId: string): Promise<void> {
   const threshold = org.trialCallThreshold ?? 0;
   if (threshold <= 0 || !org.stripeSubscriptionId) return;
 
-  // Count real (confirmed) calls booked since the trial began.
+  // Count QUALIFIED booked calls since the trial began — the same definition the
+  // guarantees use. Tentative HELD slots don't count (they can still evaporate);
+  // a genuinely-booked call that later no-shows or reschedules still does.
   const booked = await prisma.booking.count({
     where: {
       orgId,
-      status: { in: ACTIVE_SLOT_STATUSES },
+      status: { in: QUALIFIED_BOOKING_STATUSES },
       ...(org.trialStartedAt ? { createdAt: { gte: org.trialStartedAt } } : {}),
     },
   });
