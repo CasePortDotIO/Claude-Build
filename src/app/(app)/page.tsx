@@ -15,6 +15,9 @@ import { SAMPLE_SOURCE } from "@/lib/sample/seed";
 import { dailyBrief } from "@/lib/retention";
 import { engagementStreak } from "@/lib/streak";
 import { guaranteeStatus } from "@/lib/guarantee";
+import { onboardingStatus, pickQuickWins } from "@/lib/onboarding";
+import { ActivationPanel } from "@/components/onboarding/ActivationPanel";
+import { ROLE_RANK } from "@/lib/roles";
 
 // Command Center — real data (M4). KPI row, reactivations chart, live activity
 // feed, and the latest agent action. The "agent updated itself" self-improvement
@@ -30,12 +33,18 @@ export default async function CommandCenter() {
     latestBooking(ctx.orgId),
     dailyBrief(ctx.orgId),
   ]);
-  const [streak, guarantee, sampleCount] = await Promise.all([
+  const [streak, guarantee, sampleCount, onboarding] = await Promise.all([
     engagementStreak(ctx.orgId),
     guaranteeStatus(ctx.orgId),
     prisma.lead.count({ where: { orgId: ctx.orgId, source: SAMPLE_SOURCE } }),
+    onboardingStatus(ctx.orgId),
   ]);
   const hasSample = sampleCount > 0;
+  // p8 activation: the build tracker + quick-wins, shown until the workspace goes
+  // live (first booking). Suppressed while exploring sample data.
+  const showActivation = onboarding.showPanel && !hasSample;
+  const isAdmin = ROLE_RANK[ctx.role] >= ROLE_RANK.CLIENT_ADMIN;
+  const quickWins = showActivation && onboarding.submitted ? await pickQuickWins(ctx.orgId) : [];
   const today = new Date().toISOString().slice(0, 10); // per-day collapse key for the brief
 
   // Celebrate a booking only while it's fresh (< 48h); the component remembers
@@ -54,6 +63,9 @@ export default async function CommandCenter() {
         {/* Empty workspace (no real leads, no samples) — offer one-click explore */}
         {!hasSample && firstRun.leadCount === 0 && <LoadSampleDataPrompt />}
 
+        {/* p8: post-purchase activation — intake → build tracker → quick wins */}
+        {showActivation && <ActivationPanel status={onboarding} quickWins={quickWins} isAdmin={isAdmin} />}
+
         {/* M9: the payoff moment — a fresh booking lands loud */}
         {celebrate && (
           <BookingCelebration
@@ -69,7 +81,7 @@ export default async function CommandCenter() {
 
         {/* M9: guided first sweep — shown until they take one lead all the way to
             a send. Suppressed while on sample data (the banner is onboarding then). */}
-        {!firstRun.complete && !hasSample && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
+        {!firstRun.complete && !hasSample && !showActivation && <FirstRunGuide state={firstRun} operatorName={ctx.name ?? ""} />}
 
         {/* M10: the daily habit loop — what the agent did overnight (real data only) */}
         {firstRun.complete && !hasSample && <MorningBrief brief={brief} streak={streak} dateKey={today} />}

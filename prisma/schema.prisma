@@ -97,6 +97,12 @@ model Org {
   // aggregate pattern-learning across the outcome log. Never customer-facing.
   vertical String?
 
+  // Onboarding intake (p8): the buyer's 1–2 sentence ideal-client description and
+  // when they submitted intake — the anchor for the activation SLAs (build 48h,
+  // first outreach 72h, dashboard activity 5–7 days) shown on the build tracker.
+  idealClient          String?   @db.Text
+  onboardingSubmittedAt DateTime?
+
   // M9: what one client is worth to this coach. Set once during the first sweep;
   // stamps each imported lead's dealValueCents and powers the "dormant pipeline"
   // reveal + recovered-revenue math. 0 until the operator tells us.
