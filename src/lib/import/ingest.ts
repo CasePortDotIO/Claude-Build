@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { assertPriorContact, PriorContactError } from "@/lib/import/prior-contact-gate";
 import { assertEntitled } from "@/lib/billing/entitle";
 import { EntitlementError } from "@/lib/billing/entitlement-errors";
+import { remainingOneTimeQuota } from "@/lib/billing/grant";
 import { getEmailVerifier } from "@/lib/verify";
 import type { MappedLead } from "@/lib/import/mapping";
 import type { ConsentBasis, Prisma, Reachability } from "@prisma/client";
@@ -88,16 +89,30 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
   const verdictFor = (email: string) =>
     byEmail.get(email.toLowerCase()) ?? { email, status: "RISKY" as Reachability, reason: "unverified" };
 
-  const toInsert = candidates.filter((l) => verdictFor(l.email).status !== "INVALID");
+  let toInsert = candidates.filter((l) => verdictFor(l.email).status !== "INVALID");
   const invalidEmails = candidates.map((l) => l.email).filter((e) => verdictFor(e).status === "INVALID");
-  const reachable = toInsert.filter((l) => verdictFor(l.email).status === "REACHABLE").length;
-  const risky = toInsert.length - reachable;
 
   // M9: stamp each lead with the operator's average client value so the dormant
   // pipeline is real and the recovered-revenue KPI has something to count when
   // a lead eventually books. 0 (the default) simply means "not told yet".
-  const org = await prisma.org.findUnique({ where: { id: opts.orgId }, select: { avgClientValueCents: true } });
+  const org = await prisma.org.findUnique({ where: { id: opts.orgId }, select: { avgClientValueCents: true, oneTimeLeadQuota: true } });
   const dealValueCents = org?.avgClientValueCents ?? 0;
+
+  // One-time tiers (Founding $27 / +$17 bump) carry a TOTAL lead quota — a $27
+  // buyer sweeps their first 100 (or 500) leads, not an unbounded monthly meter.
+  // Trim the import to what's left of the quota so margin holds on a one-time fee.
+  // (The trimmed leads fall into skippedRows below.)
+  if (org?.oneTimeLeadQuota != null) {
+    const existing = await prisma.lead.count({ where: { orgId: opts.orgId } });
+    const remaining = remainingOneTimeQuota(org.oneTimeLeadQuota, existing);
+    if (toInsert.length > remaining) toInsert = toInsert.slice(0, remaining);
+    if (toInsert.length === 0) {
+      return { ok: false, error: "You've reached your plan's lead limit — upgrade to sweep more.", ...empty };
+    }
+  }
+
+  const reachable = toInsert.filter((l) => verdictFor(l.email).status === "REACHABLE").length;
+  const risky = toInsert.length - reachable;
 
   // (3) Persist atomically.
   const record = await prisma.$transaction(async (tx) => {

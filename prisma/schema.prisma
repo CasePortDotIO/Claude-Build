@@ -73,9 +73,17 @@ model Org {
   // webhook per purchased price (null → derived from billingStatus). The meter
   // counts fresh leads DRAFTED this billing period; the per-tier soft ceiling is
   // fair-use, the hard ceiling is the kill-switch that protects LLM-cost margin.
-  planTier              String?   // NONE | TRIAL | FRONT_END | OTO1 | CONTINUITY | PERFORMANCE | RESELLER
+  planTier              String?   // NONE | TRIAL | FRONT_END | OTO1 | CONTINUITY | PERFORMANCE | RESELLER | AGENCY
   leadsDraftedThisPeriod Int      @default(0)
   meterPeriodStart      DateTime  @default(now())
+
+  // One-time tiers (Founding $27, +$17 bump) grant a TOTAL lifetime lead quota,
+  // not a monthly meter: 100 leads (500 with the backlog bump). Null → not a
+  // quota'd tier (unlimited, e.g. Own-It $197). Enforced at import.
+  oneTimeLeadQuota      Int?
+  // Performance plan ($97/mo + fee per booked call): the Stripe subscription item
+  // to report per-booked-call usage against. Null → not on a metered plan.
+  meteredSubscriptionItemId String?
 
   // Result-gated $0 trial ("pay nothing until it books N calls"). When a trial
   // subscription starts we stamp trialStartedAt + the call threshold; once the

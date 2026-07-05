@@ -9,7 +9,7 @@ import { validateBookingSlot } from "@/lib/calendar/validate";
 import { sendBookingConfirmation } from "@/lib/agent/reminders";
 import { ACTIVE_SLOT_STATUSES, QUALIFIED_BOOKING_STATUSES } from "@/lib/booking-status";
 import { recordOutcome } from "@/lib/outcomes";
-import { endTrialNow } from "@/lib/billing/stripe";
+import { endTrialNow, reportBookingUsage } from "@/lib/billing/stripe";
 import { reportError } from "@/lib/observability/report";
 
 export class BookingError extends Error {
@@ -158,7 +158,18 @@ export async function bookCall(opts: {
   // never let a billing side effect break the booking that just succeeded.
   await maybeConvertTrial(orgId).catch((err) => reportError(err, { source: "trial-convert", orgId }));
 
+  // Performance plan ($97/mo + fee per booked call): report one metered unit. A
+  // booked call is the billable event. Best-effort — never blocks the booking.
+  await reportMeteredBooking(orgId).catch(() => {});
+
   return booking;
+}
+
+/** Report one booked call to Stripe if the org is on the metered Performance plan. */
+async function reportMeteredBooking(orgId: string): Promise<void> {
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { meteredSubscriptionItemId: true } });
+  if (!org?.meteredSubscriptionItemId) return;
+  await reportBookingUsage(org.meteredSubscriptionItemId);
 }
 
 /**
