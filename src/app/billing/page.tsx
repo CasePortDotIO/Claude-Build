@@ -39,6 +39,7 @@ export default async function BillingPage() {
         planName={plan.name}
         priceLabel={plan.price}
         orgName={org.brandName || org.name}
+        billingStatus={org.billingStatus}
       />
     </div>
   );
