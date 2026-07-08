@@ -18,6 +18,7 @@ import { guaranteeStatus } from "@/lib/guarantee";
 import { onboardingStatus, pickQuickWins } from "@/lib/onboarding";
 import { ActivationPanel } from "@/components/onboarding/ActivationPanel";
 import { ROLE_RANK } from "@/lib/roles";
+import { exploreModeEnabled } from "@/lib/config/flags";
 
 // Command Center — real data (M4). KPI row, reactivations chart, live activity
 // feed, and the latest agent action. The "agent updated itself" self-improvement
@@ -33,11 +34,12 @@ export default async function CommandCenter() {
     latestBooking(ctx.orgId),
     dailyBrief(ctx.orgId),
   ]);
-  const [streak, guarantee, sampleCount, onboarding] = await Promise.all([
+  const [streak, guarantee, sampleCount, onboarding, explore] = await Promise.all([
     engagementStreak(ctx.orgId),
     guaranteeStatus(ctx.orgId),
     prisma.lead.count({ where: { orgId: ctx.orgId, source: SAMPLE_SOURCE } }),
     onboardingStatus(ctx.orgId),
+    exploreModeEnabled(),
   ]);
   const hasSample = sampleCount > 0;
   // p8 activation: the build tracker + quick-wins, shown until the workspace goes
@@ -60,8 +62,8 @@ export default async function CommandCenter() {
         {/* Alive-from-zero: frame the seeded sample data + offer the next steps */}
         {hasSample && <SampleDataBanner />}
 
-        {/* Empty workspace (no real leads, no samples) — offer one-click explore */}
-        {!hasSample && firstRun.leadCount === 0 && <LoadSampleDataPrompt />}
+        {/* Empty workspace (no real leads) — one-click explore, test only */}
+        {explore && !hasSample && firstRun.leadCount === 0 && <LoadSampleDataPrompt />}
 
         {/* p8: post-purchase activation — intake → build tracker → quick wins */}
         {showActivation && <ActivationPanel status={onboarding} quickWins={quickWins} isAdmin={isAdmin} />}

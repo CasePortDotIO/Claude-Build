@@ -30,7 +30,7 @@ export interface ConnectedSource {
   lastImported: number;
 }
 
-export function LeadSourcesSection({ connected }: { connected: ConnectedSource[] }) {
+export function LeadSourcesSection({ connected, exploreMode }: { connected: ConnectedSource[]; exploreMode: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState<LeadSourceKind | null>(null);
@@ -64,7 +64,7 @@ export function LeadSourcesSection({ connected }: { connected: ConnectedSource[]
                   <p className="m-0 font-heading text-[15px] font-semibold text-ink">{s.name}</p>
                   <p className="m-0 truncate text-[12.5px] text-muted-2">{s.desc}</p>
                   <p className={`m-0 mt-0.5 text-[12px] font-semibold ${isConnected ? "text-sweep" : "text-muted-3"}`}>
-                    {isConnected ? (conn?.live ? "✓ Connected (live)" : "✓ Connected (sample)") : "Not connected"}
+                    {isConnected ? (exploreMode && !conn?.live ? "✓ Connected (test)" : "✓ Connected") : "Not connected"}
                     {conn && conn.lastImported > 0 ? ` · ${conn.lastImported} imported` : ""}
                   </p>
                 </div>
@@ -93,7 +93,7 @@ export function LeadSourcesSection({ connected }: { connected: ConnectedSource[]
                   <input
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={`${s.name} API key (leave blank for sample data)`}
+                    placeholder={exploreMode ? `${s.name} API key (blank = test data)` : `${s.name} API key`}
                     className="mb-2 w-full rounded-lg border border-line-3 bg-white px-3 py-2 text-[13px] outline-none focus:border-sweep"
                   />
                   {s.fields.map((f) => (
@@ -106,11 +106,11 @@ export function LeadSourcesSection({ connected }: { connected: ConnectedSource[]
                     />
                   ))}
                   <button
-                    disabled={pending}
+                    disabled={pending || (!exploreMode && !apiKey)}
                     onClick={() => run(async () => { const r = await connectLeadSourceAction({ provider: s.provider, apiKey: apiKey || undefined, config }); if (r.ok) setOpen(null); return r; })}
                     className="rounded-lg bg-sweep px-4 py-2 text-[12.5px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
                   >
-                    {pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : apiKey ? "Connect (live)" : "Connect (sample)"}
+                    {pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : exploreMode && !apiKey ? "Connect (test)" : "Connect"}
                   </button>
                 </div>
               )}

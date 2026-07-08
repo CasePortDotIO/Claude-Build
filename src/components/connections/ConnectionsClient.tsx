@@ -33,6 +33,7 @@ export function ConnectionsClient({
   calendar,
   slackConfigured,
   calcomWebhookUrl,
+  exploreMode,
 }: {
   mailboxes: MailboxVM[];
   googleConfigured: boolean;
@@ -40,6 +41,7 @@ export function ConnectionsClient({
   calendar: CalendarVM | null;
   slackConfigured: boolean;
   calcomWebhookUrl: string;
+  exploreMode: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -86,7 +88,7 @@ export function ConnectionsClient({
               Connect
             </a>
           ) : (
-            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Direct Gmail connection isn't enabled for this workspace yet — use the demo mailbox below to run the full loop.">
+            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Gmail connection isn't enabled for this workspace yet — reach out to support to turn it on.">
               Not available yet
             </span>
           )}
@@ -99,52 +101,60 @@ export function ConnectionsClient({
               Connect
             </a>
           ) : (
-            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Direct Outlook connection isn't enabled for this workspace yet — use the demo mailbox below to run the full loop.">
+            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3" title="Outlook connection isn't enabled for this workspace yet — reach out to support to turn it on.">
               Not available yet
             </span>
           )}
         </Card>
       </div>
 
-      <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Just exploring? Try a demo mailbox</p>
-      <div className="mb-7 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <Card mono="◎" monoBg="#1B7A57" name="Demo mailbox" desc="Run the full send + reply loop without connecting a real inbox" status={statusFor(mailboxes, "SIMULATION")}>
-          {statusFor(mailboxes, "SIMULATION") === "Connected" ? (
-            <button
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const sim = mailboxes.find((m) => m.provider === "SIMULATION");
-                  if (sim) { toastResult(await disconnectMailboxAction(sim.id)); router.refresh(); }
-                })
-              }
-              className="rounded-lg border border-line-3 bg-white px-4 py-2 text-[13px] font-semibold text-muted hover:bg-cream"
-            >
-              Disconnect
-            </button>
-          ) : (
-            <button
-              disabled={pending}
-              onClick={() => startTransition(async () => { toastResult(await connectSimulationMailboxAction()); router.refresh(); })}
-              className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
-            >
-              {pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Connect"}
-            </button>
-          )}
-        </Card>
-      </div>
+      {exploreMode && (
+        <>
+          <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Test inbox</p>
+          <div className="mb-7 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <Card mono="◎" monoBg="#1B7A57" name="Test inbox" desc="Run the full send + reply loop without a real inbox (test mode — no real email is sent)" status={statusFor(mailboxes, "SIMULATION")}>
+              {statusFor(mailboxes, "SIMULATION") === "Connected" ? (
+                <button
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const sim = mailboxes.find((m) => m.provider === "SIMULATION");
+                      if (sim) { toastResult(await disconnectMailboxAction(sim.id)); router.refresh(); }
+                    })
+                  }
+                  className="rounded-lg border border-line-3 bg-white px-4 py-2 text-[13px] font-semibold text-muted hover:bg-cream"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  disabled={pending}
+                  onClick={() => startTransition(async () => { toastResult(await connectSimulationMailboxAction()); router.refresh(); })}
+                  className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+                >
+                  {pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Connect"}
+                </button>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
 
       <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Calendar &amp; booking</p>
       <div className="mb-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <Card mono="C" monoBg="#1a1a1a" name="Cal.com" desc="Offer real slots & book the call" status={calConnected && calendar?.provider === "CALCOM" ? "Connected" : "Not connected"}>
-          <button
-            disabled={pending}
-            onClick={() => run(() => connectSimulationCalendarAction())}
-            className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
-            title="Connect a demo calendar to try booking real-looking time slots"
-          >
-            {calConnected ? "Reconnect demo" : "Use a demo calendar"}
-          </button>
+        <Card mono="C" monoBg="#1a1a1a" name="Cal.com" desc="Offer real slots & book the call" status={calConnected && calendar?.provider === "CALCOM" ? "Connected" : "Add your booking link below"}>
+          {exploreMode ? (
+            <button
+              disabled={pending}
+              onClick={() => run(() => connectSimulationCalendarAction())}
+              className="rounded-lg bg-sweep px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+              title="Connect a test calendar to try booking time slots (test mode)"
+            >
+              {calConnected ? "Reconnect test" : "Use a test calendar"}
+            </button>
+          ) : (
+            <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Link-based</span>
+          )}
         </Card>
         <Card mono="◷" monoBg="#0a1f3c" name="Calendly" desc="Offer slots; invitee self-books (webhook)" status={calConnected && calendar?.provider === "CALENDLY" ? "Connected" : "Use the booking link below"}>
           <span className="rounded-lg border border-line-3 px-3 py-2 text-[12px] text-muted-3">Link-based</span>

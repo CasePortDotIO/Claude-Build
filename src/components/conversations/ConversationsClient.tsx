@@ -222,7 +222,7 @@ export function ConversationsClient({ conversations }: { conversations: Conversa
             />
             {active.isDemo && (
               <div className="flex flex-wrap items-center gap-2 border-t border-line-2 pt-3">
-                <span className="text-[12px] text-muted-3">Preview how the agent reacts (demo thread):</span>
+                <span className="text-[12px] text-muted-3">Preview how the agent reacts (test thread):</span>
                 <SimBtn disabled={pending} onClick={() => simulate("positive")}>They reply “interested”</SimBtn>
                 <SimBtn disabled={pending} onClick={() => simulate("optout")}>They opt out</SimBtn>
                 <SimBtn disabled={pending} onClick={() => simulate("bounce")}>It bounces</SimBtn>

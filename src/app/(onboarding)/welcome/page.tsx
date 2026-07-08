@@ -4,6 +4,7 @@ import { hasGoogleOAuth, hasMicrosoftOAuth } from "@/lib/mailbox";
 import { resolveBranding } from "@/lib/branding";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { isSampleMailbox } from "@/lib/sample/seed";
+import { exploreModeEnabled } from "@/lib/config/flags";
 
 /**
  * Post-signup setup wizard. Moves the "connect email + calendar" basics out of
@@ -48,6 +49,7 @@ export default async function WelcomePage({
       bookingLink={connectedCalendar?.bookingLink ?? null}
       googleConfigured={await hasGoogleOAuth()}
       microsoftConfigured={await hasMicrosoftOAuth()}
+      exploreMode={await exploreModeEnabled()}
       notice={notice}
     />
   );
@@ -57,7 +59,7 @@ function errorText(code: string): string {
   switch (code) {
     case "google_not_configured":
     case "microsoft_not_configured":
-      return "That provider isn't set up yet — use the demo mailbox for now and connect the real one later.";
+      return "That provider isn't enabled for this workspace yet — reach out to support to turn it on.";
     case "exchange_failed":
       return "Couldn't finish connecting. Please try again.";
     case "org_mismatch":

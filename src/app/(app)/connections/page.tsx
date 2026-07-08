@@ -1,5 +1,6 @@
 import { requireOrg } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { exploreModeEnabled } from "@/lib/config/flags";
 import { hasGoogleOAuth, hasMicrosoftOAuth } from "@/lib/mailbox";
 import { getLeadSource, leadSourceContext } from "@/lib/leadsource";
 import { calcomWebhookUrl } from "@/lib/webhook-token";
@@ -10,6 +11,7 @@ import { AutopilotSection } from "@/components/connections/AutopilotSection";
 
 export default async function ConnectionsPage() {
   const ctx = await requireOrg();
+  const explore = await exploreModeEnabled();
   const [mailboxes, calendars, org, leadSources] = await Promise.all([
     prisma.mailbox.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
     prisma.calendarConnection.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } }),
@@ -47,8 +49,9 @@ export default async function ConnectionsPage() {
           calendar={calendar ? { provider: calendar.provider, status: calendar.status, bookingLink: calendar.bookingLink } : null}
           slackConfigured={Boolean(org?.slackWebhookEnc)}
           calcomWebhookUrl={calcomWebhookUrl(ctx.orgId)}
+          exploreMode={explore}
         />
-        <LeadSourcesSection connected={connectedSources} />
+        <LeadSourcesSection connected={connectedSources} exploreMode={explore} />
         <AutopilotSection
           initial={{
             sync: org?.autopilotSync ?? false,
