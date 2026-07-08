@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IMPORTABLE_FIELDS } from "@/lib/types";
-import { importLeadsAction, type ImportResult } from "@/server/actions/import";
+import { importLeadsAction, fetchGoogleSheetCsvAction, type ImportResult } from "@/server/actions/import";
 import { CountUp } from "@/components/magic/CountUp";
 import { TrustStrip } from "@/components/magic/TrustStrip";
 import { formatMoney } from "@/lib/format";
@@ -60,44 +60,79 @@ export function ImportWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
 
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [loadingSheet, setLoadingSheet] = useState(false);
+
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-    if (!/\.csv$/i.test(file.name) && file.type !== "text/csv") {
-      setError("That doesn't look like a CSV. Export your list as .csv and try again.");
+    if (!/\.(csv|xlsx|xls)$/i.test(file.name) && file.type !== "text/csv") {
+      setError("That doesn't look like a spreadsheet. Upload a .csv or .xlsx file.");
       return;
     }
     onFile(file);
   }
 
-  function onFile(file: File) {
+  // Turn whatever the operator gave us into CSV text, then run the one parse path.
+  async function parseCsvText(text: string) {
+    // Load the CSV parser on first use so it isn't in the route's initial JS.
+    const Papa = (await import("papaparse")).default;
+    const parsed = Papa.parse<Record<string, string>>(text, {
+      header: true,
+      skipEmptyLines: "greedy",
+      transformHeader: (h) => h.trim(),
+    });
+    const headers = (parsed.meta.fields ?? []).filter(Boolean);
+    if (headers.length === 0) {
+      setError("Couldn't read any columns. Make sure the first row is your column headers.");
+      return;
+    }
+    const rows = (parsed.data ?? []).filter((r) => headers.some((h) => (r[h] ?? "").trim()));
+    setCsvText(text);
+    setPreview({ headers, rows: rows.slice(0, 5), rowCount: rows.length });
+    setColumnMap(guess(headers));
+    setStep("map");
+  }
+
+  async function onFile(file: File) {
     setError(null);
     setFileName(file.name);
-    if (!sweepName) setSweepName(file.name.replace(/\.csv$/i, ""));
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const text = String(reader.result ?? "");
-      setCsvText(text);
-      // Load the CSV parser on first use so it isn't in the route's initial JS.
-      const Papa = (await import("papaparse")).default;
-      const parsed = Papa.parse<Record<string, string>>(text, {
-        header: true,
-        skipEmptyLines: "greedy",
-        transformHeader: (h) => h.trim(),
-      });
-      const headers = (parsed.meta.fields ?? []).filter(Boolean);
-      if (headers.length === 0) {
-        setError("Couldn't read any columns from that file. Is it a CSV with a header row?");
+    if (!sweepName) setSweepName(file.name.replace(/\.(csv|xlsx|xls)$/i, ""));
+    try {
+      if (/\.(xlsx|xls)$/i.test(file.name)) {
+        // Excel → convert the first sheet to CSV client-side (lazy-loaded parser).
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) { setError("That workbook has no sheets we can read."); return; }
+        await parseCsvText(XLSX.utils.sheet_to_csv(ws));
+      } else {
+        await parseCsvText(await file.text());
+      }
+    } catch {
+      setError("Couldn't read that file. Try re-exporting it as .csv or .xlsx.");
+    }
+  }
+
+  async function importSheet() {
+    setError(null);
+    const url = sheetUrl.trim();
+    if (!url) return;
+    setLoadingSheet(true);
+    try {
+      const r = await fetchGoogleSheetCsvAction(url);
+      if (!r.ok || !r.csv) {
+        setError(r.error ?? "Couldn't read that sheet.");
         return;
       }
-      const rows = (parsed.data ?? []).filter((r) => headers.some((h) => (r[h] ?? "").trim()));
-      setPreview({ headers, rows: rows.slice(0, 5), rowCount: rows.length });
-      setColumnMap(guess(headers));
-      setStep("map");
-    };
-    reader.readAsText(file);
+      setFileName("Google Sheet");
+      if (!sweepName) setSweepName("Google Sheet import");
+      await parseCsvText(r.csv);
+    } finally {
+      setLoadingSheet(false);
+    }
   }
 
   async function submit() {
@@ -258,7 +293,7 @@ export function ImportWizard() {
               <p className="m-0 mt-1.5 text-[11.5px] text-muted-3">Optional — unlocks your dormant pipeline in dollars.</p>
             </div>
           </div>
-          <label className="mb-2 mt-5 block text-[13px] font-semibold text-ink">Lead list (CSV)</label>
+          <label className="mb-2 mt-5 block text-[13px] font-semibold text-ink">Lead list (CSV or Excel)</label>
           <label
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
@@ -270,15 +305,34 @@ export function ImportWizard() {
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1B7A57" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
             </svg>
-            <p className="m-0 text-[14px] font-semibold text-ink">{dragging ? "Drop to upload" : "Drop a CSV or click to choose"}</p>
-            <p className="m-0 mt-1 text-[12.5px] text-muted">First row should be column headers</p>
+            <p className="m-0 text-[14px] font-semibold text-ink">{dragging ? "Drop to upload" : "Drop a CSV or Excel file, or click to choose"}</p>
+            <p className="m-0 mt-1 text-[12.5px] text-muted">.csv or .xlsx · first row should be column headers</p>
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
             />
           </label>
+
+          {/* Google Sheets — paste a link (share as "anyone with the link can view") */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line-2 bg-cream px-3.5 py-3">
+            <span className="text-[12.5px] font-semibold text-ink">…or import from Google Sheets</span>
+            <input
+              value={sheetUrl}
+              onChange={(e) => setSheetUrl(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/d/…"
+              className="min-w-[220px] flex-1 rounded-lg border border-line-3 bg-white px-3 py-2 text-[13px] outline-none focus:border-sweep"
+            />
+            <button
+              onClick={importSheet}
+              disabled={loadingSheet || !sheetUrl.trim()}
+              className="rounded-lg border border-line-3 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-muted hover:bg-white disabled:opacity-50"
+            >
+              {loadingSheet ? "Loading…" : "Load sheet"}
+            </button>
+            <p className="m-0 w-full text-[11.5px] text-muted-3">Share the sheet as “anyone with the link can view” so we can read it.</p>
+          </div>
         </div>
         <TrustStrip className="mt-4" />
         </>
@@ -293,6 +347,12 @@ export function ImportWizard() {
               {preview.rowCount} contacts detected in <span className="font-medium text-ink">{fileName}</span>. Match
               each field to a column — only Email is required.
             </p>
+            {preview.rowCount < 50 && (
+              <div className="mb-5 rounded-lg border border-[#f0dcc9] bg-[#FBF3EC] px-3.5 py-2.5 text-[12.5px] leading-[1.5] text-[#7a5a44]">
+                This list has fewer than 50 contacts. You can still import it, but the booked-calls guarantee needs a
+                list of <span className="font-semibold">50+</span> to kick in.
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {IMPORTABLE_FIELDS.map((field) => (
                 <div key={field.key} className="flex items-center gap-3">
