@@ -17,6 +17,11 @@ export default function AdminHome() {
           title="Go-Live Readiness"
           desc="Live check of every launch requirement — Stripe, email, OAuth, AI, crons, and per-workspace setup."
         />
+        <AdminCard
+          href="/admin/orgs"
+          title="Workspaces"
+          desc="Every workspace's tier, billing, usage, trial progress, and guarantee obligations — with comp / suspend / tier controls."
+        />
       </div>
     </div>
   );
