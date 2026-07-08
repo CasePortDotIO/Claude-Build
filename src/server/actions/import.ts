@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { parseCsv } from "@/lib/import/csv";
 import { applyMapping } from "@/lib/import/mapping";
 import { ingestLeads } from "@/lib/import/ingest";
+import { googleSheetExportUrl } from "@/lib/import/google-sheet";
 import { importRequestSchema } from "@/lib/zod/lead";
 
 export interface ImportResult {
@@ -23,6 +24,37 @@ export interface ImportResult {
   // M9: the dormant-pipeline reveal — what just walked back through the door.
   avgClientValueCents?: number;
   dormantPipelineCents?: number; // imported × avg client value
+}
+
+export interface SheetCsvResult {
+  ok: boolean;
+  error?: string;
+  csv?: string;
+}
+
+/**
+ * Fetch a Google Sheet as CSV so it can flow through the same import pipeline as
+ * a CSV/Excel upload. Only ever hits the Google Sheets CSV export endpoint built
+ * from the extracted sheet id (never the raw pasted URL) — no SSRF surface. The
+ * sheet must be shared "anyone with the link can view" for the export to work.
+ */
+export async function fetchGoogleSheetCsvAction(rawUrl: string): Promise<SheetCsvResult> {
+  await requireOrg();
+  const exportUrl = googleSheetExportUrl(rawUrl);
+  if (!exportUrl) return { ok: false, error: "That doesn't look like a Google Sheets link." };
+  try {
+    const res = await fetch(exportUrl, { redirect: "follow" });
+    const text = await res.text();
+    const ct = res.headers.get("content-type") ?? "";
+    // Google returns an HTML login/permission page (200) for private sheets.
+    if (!res.ok || ct.includes("text/html") || text.trimStart().startsWith("<")) {
+      return { ok: false, error: "Couldn't read that sheet — share it as “anyone with the link can view” and try again." };
+    }
+    if (text.length > 5_000_000) return { ok: false, error: "That sheet is too large — export a CSV under 5MB." };
+    return { ok: true, csv: text };
+  } catch {
+    return { ok: false, error: "Couldn't reach Google Sheets — check the link and try again." };
+  }
 }
 
 /**
