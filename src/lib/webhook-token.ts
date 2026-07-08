@@ -39,3 +39,8 @@ export function calcomWebhookUrl(orgId: string): string {
   const base = process.env.NEXTAUTH_URL || "http://localhost:3000";
   return `${base}/api/webhooks/calcom?t=${makeWebhookToken(orgId)}`;
 }
+
+export function leadWebhookUrl(orgId: string): string {
+  const base = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  return `${base}/api/webhooks/lead?t=${makeWebhookToken(orgId)}`;
+}

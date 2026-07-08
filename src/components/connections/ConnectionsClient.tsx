@@ -33,6 +33,7 @@ export function ConnectionsClient({
   calendar,
   slackConfigured,
   calcomWebhookUrl,
+  leadWebhookUrl,
   exploreMode,
 }: {
   mailboxes: MailboxVM[];
@@ -41,6 +42,7 @@ export function ConnectionsClient({
   calendar: CalendarVM | null;
   slackConfigured: boolean;
   calcomWebhookUrl: string;
+  leadWebhookUrl: string;
   exploreMode: boolean;
 }) {
   const router = useRouter();
@@ -196,6 +198,18 @@ export function ConnectionsClient({
             Save webhook
           </button>
         </div>
+      </div>
+
+      <p className="mb-3.5 text-[12px] font-semibold uppercase tracking-[1.6px] text-muted-2">Inbound lead webhook</p>
+      <div className="mb-7 rounded-xl2 border border-line bg-white p-4 shadow-card">
+        <p className="m-0 mb-2 text-[12.5px] leading-[1.5] text-muted">
+          POST a new lead here (form, CRM, or Zapier) and the agent contacts them within minutes — not on the next
+          sync. JSON body with at least an <code className="rounded bg-cream px-1 py-0.5 font-mono text-[11.5px]">email</code>.
+        </p>
+        <code className="block truncate rounded-lg border border-line-2 bg-cream px-3 py-2 font-mono text-[11.5px] text-muted-2" title={leadWebhookUrl}>
+          {leadWebhookUrl}
+        </code>
+        <p className="m-0 mt-1 text-[11px] text-muted-3">Carries a per-workspace signed token — leads are scoped to your org only. Wiring it up attests these are prior contacts.</p>
       </div>
 
       {connected.length > 0 && (
