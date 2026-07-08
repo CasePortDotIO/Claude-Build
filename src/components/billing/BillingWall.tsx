@@ -7,6 +7,7 @@ import {
   startCheckoutAction,
   startOneTimeCheckoutAction,
   startPerformanceCheckoutAction,
+  openBillingPortalAction,
   subscriptionStatusAction,
   type BillingActionResult,
 } from "@/server/actions/billing";
@@ -16,17 +17,20 @@ import { SpinnerLabel } from "@/components/ui/Spinner";
  * Paid-only billing wall. Shown when a workspace has no active subscription.
  * Admins can subscribe (Stripe Checkout); after payment the webhook flips the
  * org to active, and the poll below advances the user into the app automatically.
+ * A past_due workspace gets the dunning variant — update the card, not re-subscribe.
  */
 export function BillingWall({
   isAdmin,
   planName,
   priceLabel,
   orgName,
+  billingStatus,
 }: {
   isAdmin: boolean;
   planName: string;
   priceLabel: string;
   orgName: string;
+  billingStatus?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
@@ -68,6 +72,44 @@ export function BillingWall({
       setError("Couldn't start checkout — try again.");
     }
     setPending(null);
+  }
+
+  // Dunning: an existing subscriber whose payment failed. Don't sell them a new
+  // trial — get them to update the card so the same subscription recovers.
+  if (billingStatus === "past_due") {
+    return (
+      <div className="w-full max-w-[440px] rounded-xl2 border border-line bg-white p-8 shadow-card">
+        <div className="mb-5 flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-ember font-heading text-[17px] font-bold text-white">!</span>
+          <span className="font-heading text-[15px] font-semibold text-ink">The Warm Sweep&trade;</span>
+        </div>
+        <h1 className="m-0 mb-2 font-heading text-[24px] font-semibold tracking-[-0.4px] text-ink">Your payment didn&apos;t go through</h1>
+        <p className="m-0 mb-6 text-[14px] leading-[1.6] text-muted">
+          {orgName}&apos;s last {priceLabel ? `${priceLabel} ` : ""}charge failed, so the agent is paused. Update your
+          card and everything picks up right where it left off — your leads, sequences, and booked calls are all safe.
+        </p>
+        {isAdmin ? (
+          <button
+            onClick={() => go("portal", openBillingPortalAction)}
+            disabled={pending !== null}
+            className="w-full rounded-lg bg-sweep px-4 py-3 font-heading text-[14px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {pending === "portal" ? <SpinnerLabel>Opening…</SpinnerLabel> : "Update payment method"}
+          </button>
+        ) : (
+          <p className="m-0 rounded-lg border border-line-2 bg-cream px-4 py-3 text-[13px] text-muted">
+            Ask a workspace admin to update the payment method — access returns the moment the charge clears.
+          </p>
+        )}
+        {error && <p className="m-0 mt-3 text-[13px] font-medium text-ember">{error}</p>}
+        <div className="mt-6 flex items-center justify-between border-t border-line-2 pt-4 text-[12.5px]">
+          <span className="text-muted-3">Secured by Stripe</span>
+          <button onClick={() => signOut({ callbackUrl: "/sign-in" })} className="font-semibold text-muted hover:text-ink hover:underline">
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
