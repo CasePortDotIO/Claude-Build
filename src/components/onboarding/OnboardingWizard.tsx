@@ -16,6 +16,7 @@ interface Props {
   bookingLink: string | null;
   googleConfigured: boolean;
   microsoftConfigured: boolean;
+  exploreMode: boolean;
   notice: { kind: "connected" | "error"; text: string } | null;
 }
 
@@ -114,18 +115,20 @@ export function OnboardingWizard(props: Props) {
                 name="Microsoft 365 / Outlook"
                 desc="Outlook send & reply detection"
               />
-              <button
-                disabled={pending}
-                onClick={() => run(connectSimulationMailboxAction, () => { setStep(1); router.refresh(); })}
-                className="flex items-center gap-3.5 rounded-xl2 border border-sweep bg-sweep-mist px-4 py-3.5 text-left hover:opacity-90 disabled:opacity-60"
-              >
-                <Mono mono="◎" bg="#1B7A57" />
-                <div className="min-w-0 flex-1">
-                  <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Use a demo mailbox"}</p>
-                  <p className="m-0 text-[12.5px] text-muted-2">See the whole loop instantly — connect your real inbox anytime.</p>
-                </div>
-                <span className="flex-none rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white">Instant</span>
-              </button>
+              {props.exploreMode && (
+                <button
+                  disabled={pending}
+                  onClick={() => run(connectSimulationMailboxAction, () => { setStep(1); router.refresh(); })}
+                  className="flex items-center gap-3.5 rounded-xl2 border border-sweep bg-sweep-mist px-4 py-3.5 text-left hover:opacity-90 disabled:opacity-60"
+                >
+                  <Mono mono="◎" bg="#1B7A57" />
+                  <div className="min-w-0 flex-1">
+                    <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Use a test inbox"}</p>
+                    <p className="m-0 text-[12.5px] text-muted-2">Run the whole loop in test mode — no real email is sent.</p>
+                  </div>
+                  <span className="flex-none rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white">Test</span>
+                </button>
+              )}
             </div>
           )}
           <SkipRow onSkip={() => setStep(1)} />
@@ -143,18 +146,20 @@ export function OnboardingWizard(props: Props) {
             <Connected label="Calendar connected" onContinue={() => setStep(2)} />
           ) : (
             <div className="flex flex-col gap-3.5">
-              <button
-                disabled={pending}
-                onClick={() => run(connectSimulationCalendarAction, () => { setStep(2); router.refresh(); })}
-                className="flex items-center gap-3.5 rounded-xl2 border border-sweep bg-sweep-mist px-4 py-3.5 text-left hover:opacity-90 disabled:opacity-60"
-              >
-                <Mono mono="C" bg="#1a1a1a" />
-                <div className="min-w-0 flex-1">
-                  <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Connect a calendar (demo)"}</p>
-                  <p className="m-0 text-[12.5px] text-muted-2">Offers real slots & books the call. Swap in Cal.com / Calendly later.</p>
-                </div>
-                <span className="flex-none rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white">Instant</span>
-              </button>
+              {props.exploreMode && (
+                <button
+                  disabled={pending}
+                  onClick={() => run(connectSimulationCalendarAction, () => { setStep(2); router.refresh(); })}
+                  className="flex items-center gap-3.5 rounded-xl2 border border-sweep bg-sweep-mist px-4 py-3.5 text-left hover:opacity-90 disabled:opacity-60"
+                >
+                  <Mono mono="C" bg="#1a1a1a" />
+                  <div className="min-w-0 flex-1">
+                    <p className="m-0 font-heading text-[14.5px] font-semibold text-ink">{pending ? <SpinnerLabel>Connecting…</SpinnerLabel> : "Use a test calendar"}</p>
+                    <p className="m-0 text-[12.5px] text-muted-2">Try the booking flow in test mode. Add your real link below.</p>
+                  </div>
+                  <span className="flex-none rounded-md bg-sweep px-2.5 py-1 text-[11.5px] font-semibold text-white">Test</span>
+                </button>
+              )}
 
               <div className="rounded-xl2 border border-line bg-white p-4">
                 <p className="m-0 mb-2 text-[12.5px] font-semibold text-ink">…or paste your booking link</p>
