@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { exploreModeEnabled } from "@/lib/config/flags";
 import { hasGoogleOAuth, hasMicrosoftOAuth } from "@/lib/mailbox";
 import { getLeadSource, leadSourceContext } from "@/lib/leadsource";
-import { calcomWebhookUrl } from "@/lib/webhook-token";
+import { calcomWebhookUrl, leadWebhookUrl } from "@/lib/webhook-token";
 import { Topbar } from "@/components/nav/Topbar";
 import { ConnectionsClient, type MailboxVM } from "@/components/connections/ConnectionsClient";
 import { LeadSourcesSection, type ConnectedSource } from "@/components/connections/LeadSourcesSection";
@@ -49,6 +49,7 @@ export default async function ConnectionsPage() {
           calendar={calendar ? { provider: calendar.provider, status: calendar.status, bookingLink: calendar.bookingLink } : null}
           slackConfigured={Boolean(org?.slackWebhookEnc)}
           calcomWebhookUrl={calcomWebhookUrl(ctx.orgId)}
+          leadWebhookUrl={leadWebhookUrl(ctx.orgId)}
           exploreMode={explore}
         />
         <LeadSourcesSection connected={connectedSources} exploreMode={explore} />
