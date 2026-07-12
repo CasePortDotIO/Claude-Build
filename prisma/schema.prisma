@@ -875,10 +875,21 @@ model OutcomeEvent {
   vertical     String? // org's customer-type tag, snapshotted
   valueCents   Int     @default(0)
 
+  // Corpus vector completion — the first deposit into the outcome-data moat.
+  // Snapshotted at each terminal event so the record is causal from campaign one:
+  //   touch  = cadence step (1 = initial send, 2/3/4 = follow-ups),
+  //   source = list source (csv / hubspot / webhook / …),
+  //   arm    = the SYSTEM-ASSIGNED randomized experiment arm (e.g. "gap:A|angle:curiosity"),
+  //            so message/timing effects can be read as causal, not confounded.
+  touch  Int?
+  source String?
+  arm    String?
+
   createdAt DateTime @default(now())
 
   @@index([orgId, kind])
   @@index([vertical, kind])
+  @@index([arm, kind])
 }
 
 // A booked call — the terminal success of the agent loop.

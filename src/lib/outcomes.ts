@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { experimentArm } from "@/lib/agent/experiments";
 import type { OutcomeKind } from "@prisma/client";
 
 /**
@@ -21,11 +22,33 @@ export async function recordOutcome(opts: {
   variantAngle?: string | null;
   sendHour?: number | null;
   valueCents?: number;
+  // Corpus vector — derived from the lead when not passed, so EVERY terminal
+  // event (SENT / REPLIED / BOOKED / OPTED_OUT) records a complete, causal row.
+  touch?: number | null;
+  source?: string | null;
+  arm?: string | null;
   at?: Date;
 }): Promise<void> {
   try {
     const org = await prisma.org.findUnique({ where: { id: opts.orgId }, select: { vertical: true } });
     const at = opts.at ?? new Date();
+
+    // Complete the vector from the lead: which cadence step, which list source,
+    // and the system-assigned experiment arm. Best-effort — telemetry, not truth.
+    let touch = opts.touch;
+    let source = opts.source;
+    let arm = opts.arm;
+    if (opts.leadId) {
+      if (source === undefined) {
+        const lead = await prisma.lead.findUnique({ where: { id: opts.leadId }, select: { source: true } });
+        source = lead?.source ?? null;
+      }
+      if (touch === undefined) {
+        touch = await prisma.message.count({ where: { orgId: opts.orgId, leadId: opts.leadId, direction: "OUTBOUND" } });
+      }
+      if (arm === undefined) arm = experimentArm(opts.leadId);
+    }
+
     await prisma.outcomeEvent.create({
       data: {
         orgId: opts.orgId,
@@ -36,6 +59,9 @@ export async function recordOutcome(opts: {
         sendHour: opts.sendHour ?? at.getHours(),
         vertical: org?.vertical ?? null,
         valueCents: opts.valueCents ?? 0,
+        touch: touch ?? null,
+        source: source ?? null,
+        arm: arm ?? null,
       },
     });
   } catch {

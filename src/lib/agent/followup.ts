@@ -2,6 +2,7 @@ import { prisma, withDbRetry } from "@/lib/prisma";
 import { generateDraftsForLead, DraftGuardError } from "@/lib/agent/draft";
 import { transition } from "@/lib/agent/state-machine";
 import { resolveLimits } from "@/lib/billing/entitle";
+import { gapDaysFor } from "@/lib/agent/experiments";
 
 /**
  * Multi-touch follow-up engine. Most reactivations don't happen on the first
@@ -35,9 +36,6 @@ export async function runFollowupsForOrg(orgId: string, now: Date = new Date()):
   if (!org) return result;
   const operatorName = org.brandName || org.name || "the team";
 
-  const learning = await prisma.orgLearning.findUnique({ where: { orgId }, select: { followUpGapDays: true } });
-  const gapMs = Math.max(1, learning?.followUpGapDays ?? 3) * DAY_MS;
-
   // Sequence depth is a tier entitlement: single-pass tiers (maxTouches = 1) get
   // no follow-ups; multi-touch tiers get up to (maxTouches - 1). Falls back to
   // the default depth when billing isn't configured (dev/CI).
@@ -65,6 +63,10 @@ export async function runFollowupsForOrg(orgId: string, now: Date = new Date()):
 
     const touches = outbound.length;
     const lastSentAt = outbound[0].sentAt ?? outbound[0].createdAt;
+    // Follow-up gap is the randomized experiment arm for this lead (2d vs 4d),
+    // logged on outcomes — so cadence effect reads causal. During cohort-one data
+    // collection the arm is the source of truth over any reflection-tuned default.
+    const gapMs = gapDaysFor(lead.id) * DAY_MS;
     if (now.getTime() - lastSentAt.getTime() < gapMs) {
       result.skipped += 1; // not due yet
       continue;
