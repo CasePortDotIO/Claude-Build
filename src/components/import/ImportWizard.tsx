@@ -34,6 +34,21 @@ function guess(headers: string[]): Record<string, string> {
     originalInquiry: ["inquiry", "enquiry", "interest", "message", "notes"],
     statedGoal: ["goal", "objective", "outcome"],
     region: ["region", "country", "location", "state"],
+    lastEngagedAt: [
+      "last contacted",
+      "last contacted date",
+      "last contact",
+      "last contact date",
+      "last engaged",
+      "last engagement",
+      "last touch",
+      "last touched",
+      "last activity",
+      "last reply",
+      "last email",
+      "date contacted",
+      "date last contacted",
+    ],
   };
   const out: Record<string, string> = {};
   const low = headers.map((h) => ({ raw: h, n: h.toLowerCase().trim() }));

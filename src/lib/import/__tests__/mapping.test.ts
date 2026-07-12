@@ -19,6 +19,11 @@ describe("guessColumnMap", () => {
     expect(map.company).toBe("Company");
     expect(map.originalInquiry).toBe("Notes");
   });
+
+  it("maps last-contacted date headers to lastEngagedAt (coldness anchor)", () => {
+    expect(guessColumnMap(["Email", "Last Contacted"]).lastEngagedAt).toBe("Last Contacted");
+    expect(guessColumnMap(["Email", "Last Touch"]).lastEngagedAt).toBe("Last Touch");
+  });
 });
 
 describe("applyMapping", () => {
@@ -51,5 +56,11 @@ describe("applyMapping", () => {
     const { leads, skipped } = applyMapping(parsed, { firstName: "First" });
     expect(leads).toHaveLength(0);
     expect(skipped.length).toBe(parsed.rows.length);
+  });
+
+  it("passes the raw last-contacted value through for parsing at ingest", () => {
+    const p = parseCsv("Email,Last Contacted\na@x.com,2025-06-01\n");
+    const { leads } = applyMapping(p, { email: "Email", lastEngagedAt: "Last Contacted" });
+    expect(leads[0].lastEngagedAt).toBe("2025-06-01");
   });
 });

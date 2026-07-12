@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { recordOutcome, outcomeAggregates } from "@/lib/outcomes";
 import { experimentArm } from "@/lib/agent/experiments";
+import { assignCohort } from "@/lib/agent/rollups";
 
 describe("§10 outcome-data capture", () => {
   const tag = `oc-${Math.random().toString(36).slice(2, 8)}`;
@@ -47,6 +48,48 @@ describe("§10 outcome-data capture", () => {
       expect(row?.touch).toBe(2); // cadence step derived from outbound history
       expect(row?.arm).toBe(experimentArm(lead.id)); // the system-assigned randomized arm, logged
       expect(row?.arm).toMatch(/^gap:[AB]\|angle:/);
+    } finally {
+      await prisma.org.delete({ where: { id: o.id } }).catch(() => {});
+    }
+  });
+
+  it("records the causal control vector (isHoldout · arm · reachability · coldness)", async () => {
+    const o = await prisma.org.create({ data: { name: `Org ${tag}-ctl`, slug: `org-${tag}-ctl`, type: "CLIENT" } });
+    try {
+      // A lead worked 40 days after it last engaged, with a frozen reachability
+      // verdict — both are things that DRIFT, so the corpus must snapshot them.
+      const engagedAt = new Date("2026-01-01T00:00:00Z");
+      const workedAt = new Date(engagedAt.getTime() + 40 * 86_400_000);
+      const lead = await prisma.lead.create({
+        data: { orgId: o.id, email: `ctl-${tag}@x.com`, source: "csv", reachability: "REACHABLE", lastEngagedAt: engagedAt },
+      });
+
+      await recordOutcome({ orgId: o.id, leadId: lead.id, kind: "SENT", at: workedAt });
+
+      const row = await prisma.outcomeEvent.findFirst({ where: { orgId: o.id, leadId: lead.id }, orderBy: { createdAt: "desc" } });
+      // reachability is snapshotted at event time (it drifts as we re-verify).
+      expect(row?.reachability).toBe("REACHABLE");
+      // coldness = whole days between lastEngagedAt and when the lead was worked.
+      expect(row?.leadColdnessDays).toBe(40);
+
+      // isHoldout mirrors the deterministic A/B cohort, and the logged arm is the
+      // real counterfactual: HOLDOUT control carries "control", TREATMENT carries
+      // its randomized experiment arm. This is what makes lift causal.
+      const expectedHoldout = assignCohort(o.id, lead.id) === "HOLDOUT";
+      expect(row?.isHoldout).toBe(expectedHoldout);
+      expect(row?.arm).toBe(expectedHoldout ? "control" : experimentArm(lead.id));
+    } finally {
+      await prisma.org.delete({ where: { id: o.id } }).catch(() => {});
+    }
+  });
+
+  it("leaves coldness null when the lead has no last-engaged anchor", async () => {
+    const o = await prisma.org.create({ data: { name: `Org ${tag}-nc`, slug: `org-${tag}-nc`, type: "CLIENT" } });
+    try {
+      const lead = await prisma.lead.create({ data: { orgId: o.id, email: `nc-${tag}@x.com`, source: "csv" } });
+      await recordOutcome({ orgId: o.id, leadId: lead.id, kind: "SENT" });
+      const row = await prisma.outcomeEvent.findFirst({ where: { orgId: o.id, leadId: lead.id }, orderBy: { createdAt: "desc" } });
+      expect(row?.leadColdnessDays).toBeNull();
     } finally {
       await prisma.org.delete({ where: { id: o.id } }).catch(() => {});
     }

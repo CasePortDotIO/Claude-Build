@@ -1,7 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { ingestLeads } from "@/lib/import/ingest";
+import { ingestLeads, parseImportDate } from "@/lib/import/ingest";
 import { sampleLeadsFor } from "@/lib/leadsource/sample";
+
+describe("parseImportDate — coldness anchor guardrails", () => {
+  it("parses an ordinary past date", () => {
+    expect(parseImportDate("2025-06-01")?.toISOString().slice(0, 10)).toBe("2025-06-01");
+  });
+  it("returns null for blank / unparseable input", () => {
+    expect(parseImportDate(undefined)).toBeNull();
+    expect(parseImportDate("")).toBeNull();
+    expect(parseImportDate("   ")).toBeNull();
+    expect(parseImportDate("not a date")).toBeNull();
+  });
+  it("rejects future dates (a mis-mapped column) rather than poisoning coldness", () => {
+    expect(parseImportDate("2999-01-01")).toBeNull();
+  });
+  it("rejects implausible pre-2000 dates (epoch/0000 junk)", () => {
+    expect(parseImportDate("1970-01-01")).toBeNull();
+    expect(parseImportDate("1899-12-31")).toBeNull();
+  });
+});
 
 /**
  * DB-backed test of the shared ingest pipeline that EVERY importer uses (CSV +

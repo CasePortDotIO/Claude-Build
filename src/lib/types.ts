@@ -64,6 +64,7 @@ export const IMPORTABLE_FIELDS = [
   { key: "originalInquiry", label: "Original inquiry", required: false },
   { key: "statedGoal", label: "Stated goal", required: false },
   { key: "region", label: "Region", required: false },
+  { key: "lastEngagedAt", label: "Last contacted date", required: false },
 ] as const;
 
 export type ImportableFieldKey = (typeof IMPORTABLE_FIELDS)[number]["key"];

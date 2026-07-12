@@ -17,7 +17,11 @@ function bucket(leadId: string, salt: string, n: number): number {
   return h.readUInt32BE(0) % n;
 }
 
-// Arm 1 — follow-up gap. Straddles the old default (3d) so the experiment measures
+// The fixed baseline the HOLDOUT control gets — the pre-experiment default, so
+// treatment lift is measured against a real "do the normal thing" counterfactual.
+export const BASELINE_GAP_DAYS = 3;
+
+// Arm 1 — follow-up gap. Straddles the baseline (3d) so the experiment measures
 // whether a tighter or looser cadence recovers more, holding message constant.
 export const GAP_ARM_DAYS = { A: 2, B: 4 } as const;
 export type GapArm = keyof typeof GAP_ARM_DAYS;

@@ -10,6 +10,7 @@ export interface MappedLead {
   originalInquiry?: string;
   statedGoal?: string;
   region?: string;
+  lastEngagedAt?: string; // raw date string from the CSV; parsed at ingest
 }
 
 export interface MappingResult {
@@ -27,6 +28,7 @@ const OPTIONAL_FIELDS = [
   "originalInquiry",
   "statedGoal",
   "region",
+  "lastEngagedAt",
 ] as const;
 
 /**
