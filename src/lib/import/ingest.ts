@@ -42,6 +42,19 @@ export interface IngestResult {
   invalid: number; // failed verification — suppressed, never created as sendable
 }
 
+/**
+ * Parse an optional "last contacted" date from a CSV. Lenient (any format
+ * Date.parse understands) but guards against a mis-mapped column poisoning the
+ * coldness signal: rejects invalid, future, and pre-2000 dates → null.
+ */
+export function parseImportDate(raw?: string): Date | null {
+  if (!raw || !raw.trim()) return null;
+  const t = Date.parse(raw.trim());
+  if (Number.isNaN(t)) return null;
+  if (t > Date.now() || t < Date.UTC(2000, 0, 1)) return null;
+  return new Date(t);
+}
+
 export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Promise<IngestResult> {
   // (1) Hard gate — reactivation, not cold outreach.
   const empty = { imported: 0, duplicatesInDb: 0, suppressed: 0, reachable: 0, risky: 0, invalid: 0 };
@@ -150,6 +163,7 @@ export async function ingestLeads(leads: MappedLead[], opts: IngestOptions): Pro
             originalInquiry: l.originalInquiry,
             statedGoal: l.statedGoal,
             region: l.region,
+            lastEngagedAt: parseImportDate(l.lastEngagedAt),
             dealValueCents,
             reachability: v.status,
             verifiedAt: now,

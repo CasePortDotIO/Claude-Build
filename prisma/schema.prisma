@@ -328,7 +328,10 @@ model Lead {
   consentBasis ConsentBasis @default(PRIOR_INQUIRY)
   region       String? // for region-specific rules (GDPR/CASL)
   priorContact Boolean      @default(true) // import gate must attest this
-  lastTouchAt  DateTime? // last time we contacted them (for cooldown)
+  lastTouchAt  DateTime? // last time WE contacted them (for cooldown)
+  // When the lead last engaged BEFORE we started (optional import column) — the
+  // anchor for lead-coldness, likely the most predictive revival feature.
+  lastEngagedAt DateTime?
   coolDownUntil DateTime?
 
   // M11: pre-flight list hygiene (§3). Every imported address is verified before
@@ -883,7 +886,17 @@ model OutcomeEvent {
   //            so message/timing effects can be read as causal, not confounded.
   touch  Int?
   source String?
-  arm    String?
+  arm    String? // treatment: "gap:A|angle:curiosity"; control: "control"
+
+  // Causal control + drift-prone lead features, snapshotted at event time.
+  //   isHoldout        = this lead is the baseline control (no experiment arm), so
+  //                      treatment lift is measured against a real counterfactual;
+  //   reachability     = frozen here because re-verification later overwrites it;
+  //   leadColdnessDays = days between the lead's last engagement (captured at
+  //                      import) and this event — how cold it was when worked.
+  isHoldout        Boolean?
+  reachability     String?
+  leadColdnessDays Int?
 
   createdAt DateTime @default(now())
 

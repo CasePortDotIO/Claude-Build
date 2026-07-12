@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { experimentArm } from "@/lib/agent/experiments";
+import { assignCohort } from "@/lib/agent/rollups";
 import type { OutcomeKind } from "@prisma/client";
+
+const DAY_MS = 86_400_000;
 
 /**
  * §10 outcome-data capture. The tool is cloneable; proprietary data on what
@@ -26,27 +29,37 @@ export async function recordOutcome(opts: {
   // event (SENT / REPLIED / BOOKED / OPTED_OUT) records a complete, causal row.
   touch?: number | null;
   source?: string | null;
-  arm?: string | null;
   at?: Date;
 }): Promise<void> {
   try {
     const org = await prisma.org.findUnique({ where: { id: opts.orgId }, select: { vertical: true } });
     const at = opts.at ?? new Date();
 
-    // Complete the vector from the lead: which cadence step, which list source,
-    // and the system-assigned experiment arm. Best-effort — telemetry, not truth.
+    // Complete the vector from the lead: cadence step, list source, the causal
+    // control flag + the arm (control leads carry "control", not an experiment
+    // arm), reachability (frozen — it drifts), and coldness at the time worked.
+    // Best-effort — telemetry, never truth.
     let touch = opts.touch;
     let source = opts.source;
-    let arm = opts.arm;
+    let arm: string | null = null;
+    let isHoldout: boolean | null = null;
+    let reachability: string | null = null;
+    let leadColdnessDays: number | null = null;
     if (opts.leadId) {
-      if (source === undefined) {
-        const lead = await prisma.lead.findUnique({ where: { id: opts.leadId }, select: { source: true } });
-        source = lead?.source ?? null;
-      }
+      const lead = await prisma.lead.findUnique({
+        where: { id: opts.leadId },
+        select: { source: true, reachability: true, lastEngagedAt: true },
+      });
+      if (source === undefined) source = lead?.source ?? null;
       if (touch === undefined) {
         touch = await prisma.message.count({ where: { orgId: opts.orgId, leadId: opts.leadId, direction: "OUTBOUND" } });
       }
-      if (arm === undefined) arm = experimentArm(opts.leadId);
+      isHoldout = assignCohort(opts.orgId, opts.leadId) === "HOLDOUT";
+      arm = isHoldout ? "control" : experimentArm(opts.leadId);
+      reachability = lead?.reachability ?? null;
+      if (lead?.lastEngagedAt) {
+        leadColdnessDays = Math.max(0, Math.floor((at.getTime() - lead.lastEngagedAt.getTime()) / DAY_MS));
+      }
     }
 
     await prisma.outcomeEvent.create({
@@ -61,7 +74,10 @@ export async function recordOutcome(opts: {
         valueCents: opts.valueCents ?? 0,
         touch: touch ?? null,
         source: source ?? null,
-        arm: arm ?? null,
+        arm,
+        isHoldout,
+        reachability,
+        leadColdnessDays,
       },
     });
   } catch {

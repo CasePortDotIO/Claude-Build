@@ -207,14 +207,15 @@ export async function persistDraftResult(opts: {
       include: { variants: { orderBy: { index: "asc" } } },
     });
 
-    // Select the highest-confidence variant, but honor the lead's opening-angle
-    // experiment arm when a matching variant exists — so the angle actually SENT
-    // equals the logged arm, keeping the corpus causal. Both variants are
-    // model-generated and viable, so this trades ~nothing in quality for clean
-    // experimental data. Falls back to top-confidence when the angle isn't present.
+    // Select the highest-confidence variant, but for TREATMENT leads honor the
+    // opening-angle experiment arm when a matching variant exists — so the angle
+    // actually SENT equals the logged arm (causal, not confounded). The HOLDOUT
+    // control keeps the plain top-confidence pick (the baseline "normal" play),
+    // so treatment lift has a real counterfactual. Both variants are
+    // model-generated and viable, so this trades ~nothing in copy quality.
     const ranked = [...created.variants].sort((a, b) => b.confidence - a.confidence);
-    const preferredAngle = angleArm(leadId);
-    const best = ranked.find((v) => v.angle === preferredAngle) ?? ranked[0];
+    const holdout = assignCohort(orgId, leadId) === "HOLDOUT";
+    const best = holdout ? ranked[0] : (ranked.find((v) => v.angle === angleArm(leadId)) ?? ranked[0]);
     await tx.draft.update({ where: { id: created.id }, data: { selectedVariantId: best?.id } });
 
     // Observe: advance the lead's state.

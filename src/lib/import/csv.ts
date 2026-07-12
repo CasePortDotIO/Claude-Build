@@ -41,6 +41,21 @@ const FIELD_SYNONYMS: Record<string, string[]> = {
   originalInquiry: ["inquiry", "enquiry", "interest", "message", "notes", "what they wanted"],
   statedGoal: ["goal", "objective", "outcome"],
   region: ["region", "country", "location", "timezone", "state"],
+  lastEngagedAt: [
+    "last contacted",
+    "last contacted date",
+    "last contact",
+    "last contact date",
+    "last engaged",
+    "last engagement",
+    "last touch",
+    "last touched",
+    "last activity",
+    "last reply",
+    "last email",
+    "date contacted",
+    "date last contacted",
+  ],
 };
 
 export function guessColumnMap(headers: string[]): Record<string, string> {
