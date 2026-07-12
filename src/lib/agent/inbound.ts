@@ -97,6 +97,9 @@ export async function ingestInboundEmail(opts: {
   if (flags.isOptOut) {
     await applyTerminal(lead.id, "OPT_OUT", "OPTED_OUT", conversation.id, "CLOSED");
     await suppress(orgId, lead.email, "OPTED_OUT");
+    // §10: an opt-out is a terminal outcome — the corpus needs the misses, not
+    // just the wins, or the base rates it learns are biased upward.
+    await recordOutcome({ orgId, leadId: lead.id, kind: "OPTED_OUT" });
     await recordComplaintAndMaybePause(mailboxId);
     await createNotification({ orgId, kind: "OPTED_OUT", title: `${who} opted out`, body: "Unsubscribed and suppressed.", actionUrl: `/leads?id=${lead.id}` });
     return { outcome: "opt_out", leadId: lead.id, conversationId: conversation.id };

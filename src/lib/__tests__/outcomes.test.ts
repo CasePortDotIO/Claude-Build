@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { recordOutcome, outcomeAggregates } from "@/lib/outcomes";
+import { experimentArm } from "@/lib/agent/experiments";
 
 describe("§10 outcome-data capture", () => {
   const tag = `oc-${Math.random().toString(36).slice(2, 8)}`;
@@ -24,6 +25,31 @@ describe("§10 outcome-data capture", () => {
     const events = await prisma.outcomeEvent.findMany({ where: { orgId } });
     expect(events).toHaveLength(4);
     expect(events.every((e) => e.vertical === "coaching")).toBe(true);
+  });
+
+  it("completes the corpus vector (touch · source · arm) from the lead", async () => {
+    // Own org so this event doesn't pollute the shared-org aggregates above.
+    const o = await prisma.org.create({ data: { name: `Org ${tag}-cv`, slug: `org-${tag}-cv`, type: "CLIENT" } });
+    try {
+      const lead = await prisma.lead.create({ data: { orgId: o.id, email: `l-${tag}@x.com`, source: "hubspot" } });
+      const mb = await prisma.mailbox.create({ data: { orgId: o.id, email: `m-${tag}@x.sim`, provider: "SIMULATION", status: "CONNECTED" } });
+      // Two prior outbound touches → this event is on cadence step 2.
+      for (let i = 0; i < 2; i++) {
+        await prisma.message.create({
+          data: { orgId: o.id, leadId: lead.id, mailboxId: mb.id, direction: "OUTBOUND", status: "SENT", fromEmail: "op@x.sim", toEmail: lead.email, subject: `t${i}`, body: "…" },
+        });
+      }
+
+      await recordOutcome({ orgId: o.id, leadId: lead.id, kind: "REPLIED" });
+
+      const row = await prisma.outcomeEvent.findFirst({ where: { orgId: o.id, leadId: lead.id }, orderBy: { createdAt: "desc" } });
+      expect(row?.source).toBe("hubspot"); // list-source snapshotted
+      expect(row?.touch).toBe(2); // cadence step derived from outbound history
+      expect(row?.arm).toBe(experimentArm(lead.id)); // the system-assigned randomized arm, logged
+      expect(row?.arm).toMatch(/^gap:[AB]\|angle:/);
+    } finally {
+      await prisma.org.delete({ where: { id: o.id } }).catch(() => {});
+    }
   });
 
   it("aggregates conversion rates by a chosen dimension", async () => {

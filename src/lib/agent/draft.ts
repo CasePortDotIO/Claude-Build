@@ -7,6 +7,7 @@ import { computeVoiceFidelity } from "@/lib/agent/voice-match";
 import { assertContactable, ComplianceError } from "@/lib/compliance";
 import { assignCohort } from "@/lib/agent/rollups";
 import { assertDraftAllowed, recordDraft } from "@/lib/billing/meter";
+import { angleArm } from "@/lib/agent/experiments";
 import { DraftGuardError } from "@/lib/agent/draft-errors";
 import type { DraftInput, DraftResult, VoiceProfileShape } from "@/lib/ai/types";
 import type { Lead } from "@prisma/client";
@@ -206,8 +207,14 @@ export async function persistDraftResult(opts: {
       include: { variants: { orderBy: { index: "asc" } } },
     });
 
-    // Default the selected variant to the highest-confidence one.
-    const best = [...created.variants].sort((a, b) => b.confidence - a.confidence)[0];
+    // Select the highest-confidence variant, but honor the lead's opening-angle
+    // experiment arm when a matching variant exists — so the angle actually SENT
+    // equals the logged arm, keeping the corpus causal. Both variants are
+    // model-generated and viable, so this trades ~nothing in quality for clean
+    // experimental data. Falls back to top-confidence when the angle isn't present.
+    const ranked = [...created.variants].sort((a, b) => b.confidence - a.confidence);
+    const preferredAngle = angleArm(leadId);
+    const best = ranked.find((v) => v.angle === preferredAngle) ?? ranked[0];
     await tx.draft.update({ where: { id: created.id }, data: { selectedVariantId: best?.id } });
 
     // Observe: advance the lead's state.
